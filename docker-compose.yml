@@ -1,0 +1,35 @@
+services:
+  postgis:
+    image: postgis/postgis:14-3.4
+    container_name: eco-postgis
+    environment:
+      POSTGRES_DB: eco_monitoring
+      POSTGRES_USER: eco
+      POSTGRES_PASSWORD: eco
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - eco_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eco -d eco_monitoring"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:4
+    container_name: eco-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgis
+      ADMINER_DESIGN: pepa-linha
+    depends_on:
+      postgis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  eco_pgdata:
