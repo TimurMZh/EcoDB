@@ -41,14 +41,15 @@ LANGUAGE sql
 IMMUTABLE
 STRICT
 AS $$
-    SELECT lower(btrim(
-        regexp_replace(
+    -- lc_ctype=C: lower() не меняет кириллицу, поэтому регистр снимается translate.
+    SELECT translate(
+        lower(btrim(regexp_replace(
             replace(replace(p_text, 'ё', 'е'), 'Ё', 'е'),
-            '\s+',
-            ' ',
-            'g'
-        )
-    ));
+            '\s+', ' ', 'g'
+        ))),
+        'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ',
+        'абвгдежзийклмнопрстуфхцчшщъыьэюя'
+    );
 $$;
 
 CREATE OR REPLACE FUNCTION eco.fn_parse_lab_result(
