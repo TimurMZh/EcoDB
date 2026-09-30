@@ -18,6 +18,8 @@ brew install libpq
 # then add libpq to PATH, e.g. echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
 ```
 
+
+
 ## Quick start
 
 ```bash
@@ -31,12 +33,14 @@ chmod +x sql/apply.sh
 
 Default connection:
 
-| | |
-|---|---|
-| Host | `localhost` |
-| Port | `5432` |
-| Database | `eco_monitoring` |
-| User / password | `eco` / `eco` |
+
+|                 |                  |
+| --------------- | ---------------- |
+| Host            | `localhost`      |
+| Port            | `5432`           |
+| Database        | `eco_monitoring` |
+| User / password | `eco` / `eco`    |
+
 
 Override with `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD` if needed.
 
@@ -46,19 +50,23 @@ Adminer (web SQL UI) is at [http://localhost:8080](http://localhost:8080). Serve
 
 Numbered SQL files in `sql/migrations/` are applied in order. Already-applied versions are skipped (`eco.schema_migrations`).
 
-| File | Contents |
-|---|---|
-| `001_init.sql` | PostGIS extension, schema `eco`, migration log |
-| `002_tables.sql` | Tables, constraints, media-type and QC reference data |
-| `003_indexes.sql` | GIST on geometry, btree indexes, unique keys |
+
+| File                | Contents                                                    |
+| ------------------- | ----------------------------------------------------------- |
+| `001_init.sql`      | PostGIS extension, schema `eco`, migration log              |
+| `002_tables.sql`    | Tables, constraints, media-type and QC reference data       |
+| `003_indexes.sql`   | GIST on geometry, btree indexes, unique keys                |
 | `004_functions.sql` | Triggers, lab-value parsing, exceedance checks, staging ETL |
-| `005_views.sql` | ArcGIS Query Layer views and `SELECT` grants |
+| `005_views.sql`     | ArcGIS Query Layer views and `SELECT` grants                |
+
 
 Rebuild the schema from scratch:
 
 ```bash
 ./sql/apply.sh --reset
 ```
+
+
 
 ## Schema overview
 
@@ -82,6 +90,8 @@ erDiagram
     monitoring_points ||--o{ water_levels : at
     parameters ||--o{ parameter_aliases : aka
 ```
+
+
 
 **Media types:** `air`, `surface_water`, `groundwater`, `soil`, `vegetation`.
 
@@ -120,22 +130,28 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 
 The act is `docs/qa_phase4_report.md`.
 
+Phase 5 is the ArcGIS handover. Migration `010` adds a read-only login `eco_gis`. `sql/verify_phase5.sql` checks that the four views have a unique `objectid` and a `geom` column, that `vw_latest_results` hides QC codes D and R, and that `vw_results_flat` for site `OSK` over 2020–2025 returns within 3 seconds. Registration in ArcGIS Enterprise is described in `docs/ops-handover.md` (Russian). This repository does not contain an Enterprise server, so the layers are not published here.
+
 To recompute all exceedances after changing guideline values:
 
 ```sql
 SELECT eco.fn_recalc_all_exceedances();
 ```
 
+
+
 ## Views (ArcGIS Query Layers)
 
 Each view has a unique integer `objectid` and optional `geom` (`Point`, 4326). Null geometry is allowed.
 
-| View | One row per | `objectid` |
-|---|---|---|
-| `eco.vw_results_flat` | lab result | `result_id` |
-| `eco.vw_exceedances_summary` | result × standard | `exceedance_id` |
-| `eco.vw_latest_results` | latest result per (point, parameter) | `result_id` |
-| `eco.vw_water_levels` | groundwater level | `level_id` |
+
+| View                         | One row per                          | `objectid`      |
+| ---------------------------- | ------------------------------------ | --------------- |
+| `eco.vw_results_flat`        | lab result                           | `result_id`     |
+| `eco.vw_exceedances_summary` | result × standard                    | `exceedance_id` |
+| `eco.vw_latest_results`      | latest result per (point, parameter) | `result_id`     |
+| `eco.vw_water_levels`        | groundwater level                    | `level_id`      |
+
 
 Register these as Query Layers in ArcGIS Enterprise against the `eco` schema.
 
@@ -154,6 +170,8 @@ After Phase 2 data load:
 ```bash
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase2.sql
 ```
+
+
 
 ## Oskemen air-quality dataset
 
@@ -179,11 +197,13 @@ dataset/                Oskemen air-quality fetch + station panel
 etl/phase2.py           Seed dictionaries + AIR_PILOT load
 etl/phase3.py           Water report + PDF well loaders
 etl/phase4.py           QA/QC codes, 5% sample, spot-check report
+docs/ops-handover.md    ArcGIS registration and reload instructions
 sql/apply.sh            Apply (or reset) migrations
 sql/verify_phase1.sql   Phase 1 smoke test (always ROLLBACK)
 sql/verify_phase2.sql   Phase 2 row-count checks (does not roll back)
 sql/verify_phase3.sql   Phase 3 water-load checks (does not roll back)
+sql/verify_phase4.sql   Phase 4 QA/QC checks
+sql/verify_phase5.sql   Query Layer contract and 3-second check
 sql/migrations/         Numbered schema scripts
 ```
 
-`.env` is gitignored. Compose uses the defaults above unless you change them.
