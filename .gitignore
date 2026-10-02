@@ -5,7 +5,6 @@
 .python-version
 .ipynb_checkpoints/
 dataset/Oskemen/raw/
-dataset/Oskemen/stations/
 dataset/Oskemen/observed_mask.npz
 dataset/Oskemen/stations_map.html
 dataset/Oskemen/stations_map.png
