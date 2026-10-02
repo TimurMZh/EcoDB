@@ -1,9 +1,9 @@
 {
   "city": "Oskemen",
   "window": {
-    "start": "2024-01-01 00:00:00",
+    "start": "2021-03-24 00:00:00",
     "end": "2026-05-01 11:00:00",
-    "hours": 20436,
+    "hours": 44748,
     "timezone": "UTC"
   },
   "sources": [
@@ -20,27 +20,13 @@
     "H2S",
     "O3"
   ],
-  "stations_selected": 9,
+  "stations_selected": 10,
   "stations": [
     {
       "station": "kgmt_11",
       "longitude": 82.65275,
       "latitude": 49.945125,
       "altitude": 293.0,
-      "source": "kgmt"
-    },
-    {
-      "station": "kgmt_246",
-      "longitude": 82.740084,
-      "latitude": 50.02744,
-      "altitude": 313.0,
-      "source": "kgmt"
-    },
-    {
-      "station": "kgmt_240",
-      "longitude": 82.627857,
-      "latitude": 49.948313,
-      "altitude": 288.0,
       "source": "kgmt"
     },
     {
@@ -51,10 +37,10 @@
       "source": "kgmt"
     },
     {
-      "station": "kgmt_244",
-      "longitude": 82.624444,
-      "latitude": 49.946029,
-      "altitude": 292.0,
+      "station": "kgmt_246",
+      "longitude": 82.740084,
+      "latitude": 50.02744,
+      "altitude": 313.0,
       "source": "kgmt"
     },
     {
@@ -62,6 +48,20 @@
       "longitude": 82.565595,
       "latitude": 50.009364,
       "altitude": 313.0,
+      "source": "kgmt"
+    },
+    {
+      "station": "kgmt_244",
+      "longitude": 82.624444,
+      "latitude": 49.946029,
+      "altitude": 292.0,
+      "source": "kgmt"
+    },
+    {
+      "station": "kgmt_240",
+      "longitude": 82.627857,
+      "latitude": 49.948313,
+      "altitude": 288.0,
       "source": "kgmt"
     },
     {
@@ -84,250 +84,266 @@
       "latitude": 49.900142,
       "altitude": 326.0,
       "source": "kgmt"
+    },
+    {
+      "station": "kgmt_242",
+      "longitude": 82.605813,
+      "latitude": 49.901193,
+      "altitude": 339.0,
+      "source": "kgmt"
     }
   ],
   "selection": [
     {
       "station": "kgmt_11",
-      "coverage": 0.8114,
+      "coverage": 0.8896,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
-    },
-    {
-      "station": "kgmt_246",
-      "coverage": 0.7946,
-      "source": "kgmt",
-      "kept": true,
-      "reason": NaN
-    },
-    {
-      "station": "kgmt_240",
-      "coverage": 0.7824,
-      "source": "kgmt",
-      "kept": true,
-      "reason": NaN
+      "reason": null
     },
     {
       "station": "kgmt_241",
-      "coverage": 0.7816,
+      "coverage": 0.843,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
+      "reason": null
     },
     {
-      "station": "kgmt_244",
-      "coverage": 0.7734,
+      "station": "kgmt_246",
+      "coverage": 0.8334,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
+      "reason": null
     },
     {
       "station": "kgmt_245",
-      "coverage": 0.7277,
+      "coverage": 0.8017,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
+      "reason": null
+    },
+    {
+      "station": "kgmt_244",
+      "coverage": 0.7995,
+      "source": "kgmt",
+      "kept": true,
+      "reason": null
+    },
+    {
+      "station": "kgmt_240",
+      "coverage": 0.791,
+      "source": "kgmt",
+      "kept": true,
+      "reason": null
     },
     {
       "station": "kgmt_243",
-      "coverage": 0.6953,
+      "coverage": 0.7795,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
+      "reason": null
     },
     {
       "station": "kgmt_3",
-      "coverage": 0.5713,
+      "coverage": 0.7678,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
+      "reason": null
     },
     {
       "station": "kgmt_247",
-      "coverage": 0.5238,
+      "coverage": 0.7037,
       "source": "kgmt",
       "kept": true,
-      "reason": NaN
+      "reason": null
     },
     {
       "station": "kgmt_242",
-      "coverage": 0.3944,
+      "coverage": 0.6435,
       "source": "kgmt",
-      "kept": false,
-      "reason": "below min_coverage"
+      "kept": true,
+      "reason": null
     }
   ],
   "imputation": {
     "PM2.5": {
-      "cells_total": 183924,
-      "cells_measured": 132048,
-      "cells_filled_by_interpolation": 1096,
-      "cells_filled_by_spatial": 17615,
-      "cells_filled_by_climatology": 33165,
-      "measured_fraction": 0.7179,
+      "cells_total": 447480,
+      "cells_measured": 351405,
+      "cells_filled_by_interpolation": 6085,
+      "cells_filled_by_spatial": 50990,
+      "cells_filled_by_climatology": 39000,
+      "measured_fraction": 0.7853,
       "station_ratio_to_city_median": {
-        "kgmt_11": 0.3849,
-        "kgmt_246": 1.3123,
-        "kgmt_240": 2.1734,
-        "kgmt_241": 1.0,
-        "kgmt_244": 1.5634,
-        "kgmt_245": 2.3128,
-        "kgmt_243": 1.0,
-        "kgmt_3": 0.4905,
-        "kgmt_247": 0.5611
+        "kgmt_11": 0.4146,
+        "kgmt_241": 0.8751,
+        "kgmt_246": 1.1608,
+        "kgmt_245": 1.8664,
+        "kgmt_244": 1.2699,
+        "kgmt_240": 1.5476,
+        "kgmt_243": 1.0311,
+        "kgmt_3": 0.4914,
+        "kgmt_247": 0.6894,
+        "kgmt_242": 0.8726
       }
     },
     "PM10": {
-      "cells_total": 183924,
-      "cells_measured": 131979,
-      "cells_filled_by_interpolation": 1135,
-      "cells_filled_by_spatial": 17645,
-      "cells_filled_by_climatology": 33165,
-      "measured_fraction": 0.7176,
+      "cells_total": 447480,
+      "cells_measured": 305625,
+      "cells_filled_by_interpolation": 3691,
+      "cells_filled_by_spatial": 38384,
+      "cells_filled_by_climatology": 99780,
+      "measured_fraction": 0.683,
       "station_ratio_to_city_median": {
-        "kgmt_11": 0.2017,
-        "kgmt_246": 1.4346,
-        "kgmt_240": 2.0986,
-        "kgmt_241": 1.0,
-        "kgmt_244": 1.3155,
-        "kgmt_245": 1.8737,
-        "kgmt_243": 1.1718,
-        "kgmt_3": 0.2731,
-        "kgmt_247": 1.0
+        "kgmt_11": 0.1508,
+        "kgmt_241": 0.2417,
+        "kgmt_246": 1.2143,
+        "kgmt_245": 1.6449,
+        "kgmt_244": 1.2027,
+        "kgmt_240": 1.5194,
+        "kgmt_243": 1.0601,
+        "kgmt_3": 0.2502,
+        "kgmt_247": 1.002,
+        "kgmt_242": 1.0053
       }
     },
     "PMtot": {
-      "cells_total": 183924,
-      "cells_measured": 11675,
-      "cells_filled_by_interpolation": 46,
-      "cells_filled_by_spatial": 94434,
-      "cells_filled_by_climatology": 77769,
-      "measured_fraction": 0.0635,
+      "cells_total": 447480,
+      "cells_measured": 28508,
+      "cells_filled_by_interpolation": 435,
+      "cells_filled_by_spatial": 263527,
+      "cells_filled_by_climatology": 155010,
+      "measured_fraction": 0.0637,
       "station_ratio_to_city_median": {
         "kgmt_11": 1.0,
-        "kgmt_246": 1.0,
-        "kgmt_240": 1.0,
         "kgmt_241": 1.0,
-        "kgmt_244": 1.0,
+        "kgmt_246": 1.0,
         "kgmt_245": 1.0,
+        "kgmt_244": 1.0,
+        "kgmt_240": 1.0,
         "kgmt_243": 1.0,
         "kgmt_3": 1.0,
-        "kgmt_247": 1.0
+        "kgmt_247": 1.0,
+        "kgmt_242": 1.0
       }
     },
     "SO2": {
-      "cells_total": 183924,
-      "cells_measured": 129270,
-      "cells_filled_by_interpolation": 1182,
-      "cells_filled_by_spatial": 20307,
-      "cells_filled_by_climatology": 33165,
-      "measured_fraction": 0.7028,
+      "cells_total": 447480,
+      "cells_measured": 307250,
+      "cells_filled_by_interpolation": 3842,
+      "cells_filled_by_spatial": 36608,
+      "cells_filled_by_climatology": 99780,
+      "measured_fraction": 0.6866,
       "station_ratio_to_city_median": {
         "kgmt_11": 1.0,
-        "kgmt_246": 0.8889,
-        "kgmt_240": 0.9327,
-        "kgmt_241": 0.9323,
-        "kgmt_244": 1.0,
-        "kgmt_245": 71.6666,
-        "kgmt_243": 1.0,
-        "kgmt_3": 32.3555,
-        "kgmt_247": 25.5056
+        "kgmt_241": 0.9245,
+        "kgmt_246": 0.9506,
+        "kgmt_245": 25.8938,
+        "kgmt_244": 1.6583,
+        "kgmt_240": 0.9444,
+        "kgmt_243": 0.9565,
+        "kgmt_3": 7.5861,
+        "kgmt_247": 9.7043,
+        "kgmt_242": 0.9385
       }
     },
     "NO2": {
-      "cells_total": 183924,
-      "cells_measured": 119423,
-      "cells_filled_by_interpolation": 1088,
-      "cells_filled_by_spatial": 30248,
-      "cells_filled_by_climatology": 33165,
-      "measured_fraction": 0.6493,
+      "cells_total": 447480,
+      "cells_measured": 283119,
+      "cells_filled_by_interpolation": 3388,
+      "cells_filled_by_spatial": 61193,
+      "cells_filled_by_climatology": 99780,
+      "measured_fraction": 0.6327,
       "station_ratio_to_city_median": {
-        "kgmt_11": 1.0,
-        "kgmt_246": 1.1334,
-        "kgmt_240": 1.0295,
-        "kgmt_241": 0.9906,
-        "kgmt_244": 0.8691,
-        "kgmt_245": 1.4454,
-        "kgmt_243": 0.9214,
-        "kgmt_3": 0.3313,
-        "kgmt_247": 1.1423
+        "kgmt_11": 0.0697,
+        "kgmt_241": 0.9501,
+        "kgmt_246": 1.1227,
+        "kgmt_245": 1.3079,
+        "kgmt_244": 0.8101,
+        "kgmt_240": 1.0,
+        "kgmt_243": 0.9063,
+        "kgmt_3": 0.3583,
+        "kgmt_247": 1.1627,
+        "kgmt_242": 1.0772
       }
     },
     "NO": {
-      "cells_total": 183924,
-      "cells_measured": 15632,
-      "cells_filled_by_interpolation": 79,
-      "cells_filled_by_spatial": 127029,
-      "cells_filled_by_climatology": 41184,
-      "measured_fraction": 0.085,
+      "cells_total": 447480,
+      "cells_measured": 34312,
+      "cells_filled_by_interpolation": 508,
+      "cells_filled_by_spatial": 287140,
+      "cells_filled_by_climatology": 125520,
+      "measured_fraction": 0.0767,
       "station_ratio_to_city_median": {
-        "kgmt_11": 1.0,
-        "kgmt_246": 1.0,
-        "kgmt_240": 1.0,
+        "kgmt_11": 1.2336,
         "kgmt_241": 1.0,
-        "kgmt_244": 1.0,
+        "kgmt_246": 1.0,
         "kgmt_245": 1.0,
+        "kgmt_244": 1.0,
+        "kgmt_240": 1.0,
         "kgmt_243": 1.0,
         "kgmt_3": 1.0,
-        "kgmt_247": 1.0
+        "kgmt_247": 1.0,
+        "kgmt_242": 1.0
       }
     },
     "CO": {
-      "cells_total": 183924,
-      "cells_measured": 136575,
-      "cells_filled_by_interpolation": 1124,
-      "cells_filled_by_spatial": 13060,
-      "cells_filled_by_climatology": 33165,
-      "measured_fraction": 0.7426,
+      "cells_total": 447480,
+      "cells_measured": 316279,
+      "cells_filled_by_interpolation": 3706,
+      "cells_filled_by_spatial": 27715,
+      "cells_filled_by_climatology": 99780,
+      "measured_fraction": 0.7068,
       "station_ratio_to_city_median": {
-        "kgmt_11": 2.3276,
-        "kgmt_246": 0.2146,
-        "kgmt_240": 0.0178,
-        "kgmt_241": 0.4738,
-        "kgmt_244": 0.595,
-        "kgmt_245": 1.4523,
-        "kgmt_243": 1.0,
-        "kgmt_3": 1.992,
-        "kgmt_247": 2.7554
+        "kgmt_11": 1.6371,
+        "kgmt_241": 0.8316,
+        "kgmt_246": 0.1218,
+        "kgmt_245": 1.4857,
+        "kgmt_244": 1.2903,
+        "kgmt_240": 0.0146,
+        "kgmt_243": 0.9904,
+        "kgmt_3": 1.41,
+        "kgmt_247": 2.024,
+        "kgmt_242": 0.6009
       }
     },
     "H2S": {
-      "cells_total": 183924,
-      "cells_measured": 130800,
-      "cells_filled_by_interpolation": 1220,
-      "cells_filled_by_spatial": 18739,
-      "cells_filled_by_climatology": 33165,
-      "measured_fraction": 0.7112,
+      "cells_total": 447480,
+      "cells_measured": 308787,
+      "cells_filled_by_interpolation": 3948,
+      "cells_filled_by_spatial": 34965,
+      "cells_filled_by_climatology": 99780,
+      "measured_fraction": 0.6901,
       "station_ratio_to_city_median": {
-        "kgmt_11": 0.057,
-        "kgmt_246": 1.0,
-        "kgmt_240": 1.4405,
-        "kgmt_241": 1.0,
-        "kgmt_244": 1.0,
-        "kgmt_245": 1.0,
-        "kgmt_243": 1.9389,
+        "kgmt_11": 0.0575,
+        "kgmt_241": 1.9131,
+        "kgmt_246": 0.8314,
+        "kgmt_245": 1.907,
+        "kgmt_244": 0.9243,
+        "kgmt_240": 1.1874,
+        "kgmt_243": 1.6824,
         "kgmt_3": 1.0,
-        "kgmt_247": 1.0
+        "kgmt_247": 2.3757,
+        "kgmt_242": 0.9
       }
     },
     "O3": {
-      "cells_total": 183924,
+      "cells_total": 447480,
       "cells_measured": 2307,
       "cells_filled_by_interpolation": 110,
-      "cells_filled_by_spatial": 11299,
-      "cells_filled_by_climatology": 170208,
-      "measured_fraction": 0.0125,
+      "cells_filled_by_spatial": 12823,
+      "cells_filled_by_climatology": 432240,
+      "measured_fraction": 0.0052,
       "station_ratio_to_city_median": {
         "kgmt_11": 0.5333,
-        "kgmt_246": 1.0,
-        "kgmt_240": 1.0,
         "kgmt_241": 1.0,
-        "kgmt_244": 1.0,
+        "kgmt_246": 1.0,
         "kgmt_245": 1.0,
+        "kgmt_244": 1.0,
+        "kgmt_240": 1.0,
         "kgmt_243": 1.0,
         "kgmt_3": 1.7531,
-        "kgmt_247": 1.0
+        "kgmt_247": 1.0,
+        "kgmt_242": 1.0
       }
     }
   },
