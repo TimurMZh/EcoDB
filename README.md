@@ -198,12 +198,14 @@ etl/phase2.py           Seed dictionaries + AIR_PILOT load
 etl/phase3.py           Water report + PDF well loaders
 etl/phase4.py           QA/QC codes, 5% sample, spot-check report
 docs/ops-handover.md    ArcGIS registration and reload instructions
+docs/roles.md           Read / edit / admin roles, logins to create on the server
 sql/apply.sh            Apply (or reset) migrations
 sql/verify_phase1.sql   Phase 1 smoke test (always ROLLBACK)
 sql/verify_phase2.sql   Phase 2 row-count checks (does not roll back)
 sql/verify_phase3.sql   Phase 3 water-load checks (does not roll back)
 sql/verify_phase4.sql   Phase 4 QA/QC checks
 sql/verify_phase5.sql   Query Layer contract and 3-second check
+sql/verify_roles.sql    Role and privilege checks (migration 011)
 sql/migrations/         Numbered schema scripts
 ```
 

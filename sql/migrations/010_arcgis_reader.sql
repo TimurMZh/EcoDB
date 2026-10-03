@@ -14,8 +14,14 @@ GRANT USAGE ON SCHEMA eco TO eco_gis;
 GRANT SELECT ON ALL TABLES IN SCHEMA eco TO eco_gis;
 ALTER DEFAULT PRIVILEGES IN SCHEMA eco GRANT SELECT ON TABLES TO eco_gis;
 
-COMMENT ON ROLE eco_gis IS
-  'Чтение схемы eco для ArcGIS Enterprise Query Layer. Без INSERT/UPDATE/DELETE.';
+DO $$
+BEGIN
+    IF (SELECT rolsuper OR rolcreaterole FROM pg_roles WHERE rolname = current_user) THEN
+        COMMENT ON ROLE eco_gis IS
+          'Чтение схемы eco для ArcGIS Enterprise Query Layer. Без INSERT/UPDATE/DELETE.';
+    END IF;
+END
+$$;
 
 INSERT INTO eco.schema_migrations (version, description)
 VALUES ('010', 'Роль eco_gis: SELECT на схему eco для ArcGIS')

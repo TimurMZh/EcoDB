@@ -28,6 +28,12 @@ for i in $(seq 1 60); do
   sleep 1
 done
 
+# Objects must be owned by eco_admin so that default privileges from 011 apply.
+if [[ "$(psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'eco_admin'" | tr -d '[:space:]')" == "1" ]]; then
+  export PGOPTIONS="${PGOPTIONS:-} -c role=eco_admin"
+  echo "Running as role eco_admin"
+fi
+
 if [[ "$RESET" -eq 1 ]]; then
   echo "Dropping schema eco (reset) ..."
   psql -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS eco CASCADE;"
@@ -38,15 +44,10 @@ for f in "${ROOT}"/sql/migrations/*.sql; do
   base="$(basename "$f")"
   ver="${base%%_*}"
 
-  applied="$(psql -tAc "
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = 'eco' AND table_name = 'schema_migrations'
-    ) AND EXISTS (
-      SELECT 1 FROM eco.schema_migrations WHERE version = '${ver}'
-    );
-  " | tr -d '[:space:]')"
+  applied="f"
+  if [[ "$(psql -tAc "SELECT to_regclass('eco.schema_migrations') IS NOT NULL" | tr -d '[:space:]')" == "t" ]]; then
+    applied="$(psql -tAc "SELECT EXISTS (SELECT 1 FROM eco.schema_migrations WHERE version = '${ver}')" | tr -d '[:space:]')"
+  fi
 
   if [[ "$applied" == "t" ]]; then
     echo "  skip ${base} (already applied)"
