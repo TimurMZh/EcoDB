@@ -1,6 +1,6 @@
 # Сдача: ArcGIS и эксплуатация
 
-Инструкция к фазе 5. Регистрация слоёв выполняется в ArcGIS Enterprise заказчика. В этом репозитории проверяется контракт представлений и время ответа.
+Регистрация слоёв выполняется в ArcGIS Enterprise заказчика. В этом репозитории проверяется контракт представлений и время ответа.
 
 Проверка на стенде:
 
@@ -11,15 +11,17 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 
 ## Что передаётся
 
-| Материал | Где |
-|---|---|
-| DDL схемы, с нуля | `sql/migrations/001` … `010`, запуск `sql/apply.sh` |
-| Загрузка воздуха, воды, QA/QC | `etl/phase2.py`, `etl/phase3.py`, `etl/phase4.py` |
-| Акт QA/QC и объёмы | `docs/qa_phase4_report.md` |
-| Перечень проверок QA/QC | `docs/qaqc-checks.md` |
-| Схема | `docs/er-diagram.md` |
-| Требования к серверу | `docs/server-requirements.md` |
-| Эта инструкция | `docs/ops-handover.md` |
+
+| Материал                      | Где                                                 |
+| ----------------------------- | --------------------------------------------------- |
+| DDL схемы, с нуля             | `sql/migrations/001` … `010`, запуск `sql/apply.sh` |
+| Загрузка воздуха, воды, QA/QC | `etl/phase2.py`, `etl/phase3.py`, `etl/phase4.py`   |
+| Акт QA/QC и объёмы            | `docs/qa_phase4_report.md`                          |
+| Перечень проверок QA/QC       | `docs/qaqc-checks.md`                               |
+| Схема                         | `docs/er-diagram.md`                                |
+| Требования к серверу          | `docs/server-requirements.md`                       |
+| Эта инструкция                | `docs/ops-handover.md`                              |
+
 
 Повторный запуск миграций пропускает уже применённые версии. Полный сброс схемы: `./sql/apply.sh --reset`, затем снова фазы 2–4.
 
@@ -27,23 +29,27 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 
 Учётная запись только на чтение (миграция `010`):
 
-| | |
-|---|---|
-| Сервер | хост PostgreSQL, порт `5432` |
-| База | `eco_monitoring` |
-| Пользователь | `eco_gis` |
-| Пароль стенда | `eco_gis` |
+
+|               |                              |
+| ------------- | ---------------------------- |
+| Сервер        | хост PostgreSQL, порт `5432` |
+| База          | `eco_monitoring`             |
+| Пользователь  | `eco_gis`                    |
+| Пароль стенда | `eco_gis`                    |
+
 
 Пароль стенда нужно сменить до промышленной публикации. Роль `eco_gis` имеет только `SELECT` по схеме `eco`. Загрузку данных выполняет пользователь `eco`.
 
 Четыре представления регистрируются как Query Layer. У каждого есть уникальное поле `objectid` (bigint) и столбец `geom` типа Point, EPSG:4326. `NULL` в `geom` допустим.
 
-| Представление | Строка | Поле уникальности |
-|---|---|---|
-| `eco.vw_results_flat` | один результат | `objectid` = `result_id` |
-| `eco.vw_exceedances_summary` | результат × норматив | `objectid` = `exceedance_id` |
-| `eco.vw_latest_results` | последний результат пары (точка, показатель) | `objectid` = `result_id` |
-| `eco.vw_water_levels` | замер уровня воды | `objectid` = `level_id` |
+
+| Представление                | Строка                                       | Поле уникальности            |
+| ---------------------------- | -------------------------------------------- | ---------------------------- |
+| `eco.vw_results_flat`        | один результат                               | `objectid` = `result_id`     |
+| `eco.vw_exceedances_summary` | результат × норматив                         | `objectid` = `exceedance_id` |
+| `eco.vw_latest_results`      | последний результат пары (точка, показатель) | `objectid` = `result_id`     |
+| `eco.vw_water_levels`        | замер уровня воды                            | `objectid` = `level_id`      |
+
 
 `vw_latest_results` не содержит коды QC `D` и `R`. Сейчас это 720 строк HCN, у которых пустая ячейка Excel была записана как «не обн.».
 
@@ -80,11 +86,13 @@ SELECT * FROM eco.fn_process_staging_import('НОВЫЙ_КОД_ПАРТИИ');
 
 Функция идемпотентна по паре (проба, показатель): повтор обновляет `results`. Неразобранные строки остаются с `processed_at IS NULL` и текстом в `process_error`.
 
-4. Пересчитать QC и акт:
+1. Пересчитать QC и акт:
 
 ```bash
 python3 etl/phase4.py
 ```
+
+
 
 ## Пересчёт превышений
 
@@ -103,3 +111,4 @@ SELECT eco.fn_recalc_all_exceedances();
 - Почвы и растительности в исходных файлах нет.
 - `GW-1`…`GW-4` повторяют значения `SW-1`…`SW-4` за 1 квартал 2025. Точки не слиты.
 - Регистрация в ArcGIS Enterprise на этом стенде не выполнялась: среды Enterprise здесь нет. Контракт вьюх и лимит 3 секунды проверяет `sql/verify_phase5.sql` на объёме загруженных данных (объект `OSK`, 2020–2025).
+
