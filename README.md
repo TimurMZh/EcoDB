@@ -145,12 +145,15 @@ SELECT eco.fn_recalc_all_exceedances();
 Each view has a unique integer `objectid` and optional `geom` (`Point`, 4326). Null geometry is allowed.
 
 
-| View                         | One row per                          | `objectid`      |
-| ---------------------------- | ------------------------------------ | --------------- |
-| `eco.vw_results_flat`        | lab result                           | `result_id`     |
-| `eco.vw_exceedances_summary` | result × standard                    | `exceedance_id` |
-| `eco.vw_latest_results`      | latest result per (point, parameter) | `result_id`     |
-| `eco.vw_water_levels`        | groundwater level                    | `level_id`      |
+| View                         | One row per                                | `objectid`      |
+| ---------------------------- | ------------------------------------------ | --------------- |
+| `eco.vw_results_flat`        | lab result                                 | `result_id`     |
+| `eco.vw_exceedances_summary` | result × standard                          | `exceedance_id` |
+| `eco.vw_latest_results`      | latest lab result per (point, parameter)   | `result_id`     |
+| `eco.vw_water_levels`        | groundwater level                          | `level_id`      |
+| `eco.vw_sensor_latest`       | latest station hour per (point, parameter) | `result_id`     |
+| `eco.vw_sensor_latest_wide`  | station (all latest pollutants + meteo)    | `point_id`      |
+| `eco.vw_sensor_daily`        | UTC day × station × parameter              | synthetic       |
 
 
 Register these as Query Layers in ArcGIS Enterprise against the `eco` schema.
@@ -175,7 +178,7 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 
 ## Oskemen air-quality dataset
 
-Hourly air quality for Oskemen (Ust-Kamenogorsk) is pulled from AirData.kz the same way Almaty was built in Air-DualODE: KazHydroMet via the open dump, then a gap-filled station panel with Open-Meteo ERA5 meteorology. There is no model training step. Station files include every pollutant present in `raw/` (PM2.5, PM10, SO2, NO2, …).
+Hourly air quality for Oskemen (Ust-Kamenogorsk) is pulled from AirData.kz: KazHydroMet via the open dump. Station files keep those published values. Hours a station did not report are left empty. Meteorology (temperature, pressure, humidity, wind) is Open-Meteo ERA5 at the station coordinates, because the Oskemen dump has no weather files. There is no model training step. Station files include every pollutant present in `raw/` (PM2.5, PM10, SO2, NO2, …).
 
 ```bash
 python3 -m venv .venv
@@ -186,7 +189,17 @@ python dataset/build_oskemen_stations.py
 python dataset/plot_oskemen_stations.py   # optional map
 ```
 
-Output lands in `dataset/Oskemen/`. The panel starts at 2023-01-01 and runs through the last hour in the fetched files (currently 2026-05). Override with `--start` / `--end`. `--min_coverage` is adjustable.
+Output lands in `dataset/Oskemen/`. The panel runs from the first PM2.5 hour in the fetch through the last hour. Override with `--start` / `--end`. Every station with at least one reported value is kept, including a record that covers less than 1% of the window. Unreported hours stay empty.
+
+Load the 13 stations into `eco_monitoring` (hourly pollutants → `eco.results` as `sample_type = hourly_sensor`, µg/m³ as published; meteorology → `eco.meteo_observations`, joined on station + hour):
+
+```bash
+./sql/apply.sh
+python etl/load_oskemen_stations.py
+psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_oskemen.sql
+```
+
+Lab Query Layers stay on PEK samples. ArcGIS station layers: `eco.vw_sensor_latest` (long), `eco.vw_sensor_latest_wide` (one row per station), `eco.vw_sensor_daily` (UTC daily min/avg/max). Incremental refill: `python etl/load_oskemen_stations.py --since 2026-10-01`.
 
 ## Project layout
 
@@ -195,6 +208,7 @@ docker-compose.yml      PostGIS 14-3.4 + Adminer
 docs/er-diagram.md      Entity-relationship diagram
 dataset/                Oskemen air-quality fetch + station panel
 etl/phase2.py           Seed dictionaries + AIR_PILOT load
+etl/load_oskemen_stations.py  Hourly KazHydroMet stations + ERA5 meteo
 etl/phase3.py           Water report + PDF well loaders
 etl/phase4.py           QA/QC codes, 5% sample, spot-check report
 docs/ops-handover.md    ArcGIS registration and reload instructions

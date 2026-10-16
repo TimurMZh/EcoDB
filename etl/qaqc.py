@@ -388,7 +388,15 @@ def _spot_checks(cur, run_id: int) -> None:
                 (run_id, WELLS_PDF.name, row["page"], row["protocol_value"], note),
             )
 
-    cur.execute("SELECT result_id FROM eco.results ORDER BY result_id")
+    cur.execute(
+        """
+        SELECT r.result_id
+        FROM eco.results r
+        JOIN eco.samples s ON s.sample_id = r.sample_id
+        WHERE s.sample_type IS DISTINCT FROM 'hourly_sensor'
+        ORDER BY r.result_id
+        """
+    )
     ids = [row[0] for row in cur.fetchall()]
     sample_n = max(1, math.ceil(0.05 * len(ids)))
     chosen = random.Random(SAMPLE_SEED).sample(ids, sample_n)

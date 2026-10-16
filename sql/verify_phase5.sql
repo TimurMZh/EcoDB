@@ -16,7 +16,10 @@ BEGIN
         'vw_results_flat',
         'vw_exceedances_summary',
         'vw_latest_results',
-        'vw_water_levels'
+        'vw_water_levels',
+        'vw_sensor_latest',
+        'vw_sensor_latest_wide',
+        'vw_sensor_daily'
     ]
     LOOP
         IF NOT EXISTS (
@@ -46,7 +49,10 @@ BEGIN
             'vw_results_flat',
             'vw_exceedances_summary',
             'vw_latest_results',
-            'vw_water_levels'
+            'vw_water_levels',
+            'vw_sensor_latest',
+            'vw_sensor_latest_wide',
+            'vw_sensor_daily'
         ])
     LOOP
         EXECUTE format('SELECT count(*), count(DISTINCT objectid) FROM eco.%I', v_view)
@@ -92,7 +98,10 @@ BEGIN
     END IF;
     IF NOT has_schema_privilege('eco_gis', 'eco', 'USAGE')
        OR NOT has_table_privilege('eco_gis', 'eco.vw_results_flat', 'SELECT')
-       OR NOT has_table_privilege('eco_gis', 'eco.vw_latest_results', 'SELECT') THEN
+       OR NOT has_table_privilege('eco_gis', 'eco.vw_latest_results', 'SELECT')
+       OR NOT has_table_privilege('eco_gis', 'eco.vw_sensor_latest', 'SELECT')
+       OR NOT has_table_privilege('eco_gis', 'eco.vw_sensor_latest_wide', 'SELECT')
+       OR NOT has_table_privilege('eco_gis', 'eco.vw_sensor_daily', 'SELECT') THEN
         RAISE EXCEPTION 'eco_gis cannot SELECT the ArcGIS views';
     END IF;
 END

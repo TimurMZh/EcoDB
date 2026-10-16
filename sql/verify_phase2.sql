@@ -7,8 +7,9 @@ BEGIN
     SELECT count(*) INTO n FROM eco.sites WHERE site_code = 'OSK';
     IF n <> 1 THEN RAISE EXCEPTION 'expected site OSK'; END IF;
 
-    SELECT count(*) INTO n FROM eco.monitoring_points WHERE media_type = 'air';
-    IF n <> 30 THEN RAISE EXCEPTION 'expected 30 air points, got %', n; END IF;
+    SELECT count(*) INTO n FROM eco.monitoring_points
+    WHERE media_type = 'air' AND point_type = 'СЗЗ';
+    IF n <> 30 THEN RAISE EXCEPTION 'expected 30 air СЗЗ points, got %', n; END IF;
 
     SELECT count(*) INTO n FROM eco.parameters WHERE media_type = 'air';
     IF n < 5 THEN RAISE EXCEPTION 'expected ≥5 air parameters, got %', n; END IF;
@@ -25,8 +26,9 @@ BEGIN
     SELECT count(*) INTO n FROM eco.results r
     JOIN eco.samples sm ON sm.sample_id = r.sample_id
     JOIN eco.sampling_events e ON e.event_id = sm.event_id
-    WHERE e.media_type = 'air';
-    IF n <> 2736 THEN RAISE EXCEPTION 'expected 2736 air results, got %', n; END IF;
+    WHERE e.media_type = 'air'
+      AND sm.sample_type IS DISTINCT FROM 'hourly_sensor';
+    IF n <> 2736 THEN RAISE EXCEPTION 'expected 2736 lab air results, got %', n; END IF;
 
     SELECT count(*) INTO n FROM eco.results r
     JOIN eco.parameters p ON p.param_id = r.param_id

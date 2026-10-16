@@ -4,17 +4,22 @@ Build dataset/Oskemen/ in the same station-panel layout as Almaty / Beijing1718,
 from the raw files fetched by fetch_oskemen_raw.py.
 
 This stops at the dataset. It does not build a graph or train a model.
+Pollutant cells are the AirData.kz values as published. Hours a station did
+not report are left empty. Nothing is interpolated or borrowed from another
+station.
 
 Output:
     dataset/Oskemen/station.csv                 station,longitude,latitude,altitude,source
     dataset/Oskemen/stations/<station>.csv      time, pollutants, temperature, pressure,
                                                humidity, wind_speed, wind_direction
-    dataset/Oskemen/observed_mask.npz           which pollutant cells are measured vs imputed
-    dataset/Oskemen/build_report.json           station selection and imputation accounting
+    dataset/Oskemen/observed_mask.npz           which pollutant cells were reported
+    dataset/Oskemen/build_report.json           station selection and coverage
 
-Stations are selected on PM2.5 coverage. Every other pollutant file present in
-raw/ (pm10, so2, no2, …) is aligned to the same hourly grid, imputed, and written
-as extra columns. Meteorology comes from the Open-Meteo ERA5 archive.
+Every station that reported at least one value is written, however small its
+share of the window. Pollutant files in raw/ (pm25, pm10, so2, no2, …) are
+aligned to the same hourly grid and written as extra columns, empty where that
+station did not measure them. Meteorology comes from the Open-Meteo ERA5
+archive; the Oskemen AirData dump has no weather files.
 
 Usage:
     python dataset/fetch_oskemen_raw.py --parameters pm25 pm10 so2 no2 no co h2s o3 pmtot
@@ -45,19 +50,6 @@ PARAM_COLUMNS = {
     "o3": "O3",
 }
 
-# Artifact caps (µg/m³). AirData.kz already QC'd; these only drop leftover spikes.
-PARAM_MAX = {
-    "pm25": 1000.0,
-    "pm10": 2000.0,
-    "pmtot": 3000.0,
-    "so2": 5000.0,
-    "no2": 2000.0,
-    "no": 2000.0,
-    "co": 50000.0,
-    "h2s": 1000.0,
-    "o3": 1000.0,
-}
-
 METEO_COLUMNS = ["temperature", "pressure", "humidity", "wind_speed", "wind_direction"]
 
 METEO_VARS = {
@@ -86,12 +78,20 @@ def discover_parameters(raw_dir: Path, requested: list[str] | None = None) -> li
     return found
 
 
-def last_timestamp(raw_dir: Path, code: str = "pm25") -> pd.Timestamp:
-    """Last UTC-naive hour present in a fetched pollutant file."""
+def _timestamps(raw_dir: Path, code: str = "pm25") -> pd.Series:
     path = raw_dir / f"airdatakz_oskemen_{code}.csv.gz"
     df = pd.read_csv(path, usecols=["datetime_utc"])
-    t = pd.to_datetime(df["datetime_utc"], utc=True, errors="coerce").dt.tz_localize(None)
-    return t.max().floor("h")
+    return pd.to_datetime(df["datetime_utc"], utc=True, errors="coerce").dt.tz_localize(None)
+
+
+def first_timestamp(raw_dir: Path, code: str = "pm25") -> pd.Timestamp:
+    """First UTC-naive hour present in a fetched pollutant file."""
+    return _timestamps(raw_dir, code).min().floor("h")
+
+
+def last_timestamp(raw_dir: Path, code: str = "pm25") -> pd.Timestamp:
+    """Last UTC-naive hour present in a fetched pollutant file."""
+    return _timestamps(raw_dir, code).max().floor("h")
 
 
 def load_parameter(raw_dir: Path, code: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
@@ -116,14 +116,15 @@ def load_parameter(raw_dir: Path, code: str, start: pd.Timestamp, end: pd.Timest
     return df[["station", "time", "value", "lat", "lon", "source"]]
 
 
-def build_panel(long_df: pd.DataFrame, grid: pd.DatetimeIndex, value_max: float) -> pd.DataFrame:
-    """Collapse the long table to an hourly station-by-time matrix on `grid`."""
+def build_panel(long_df: pd.DataFrame, grid: pd.DatetimeIndex) -> pd.DataFrame:
+    """Collapse the long table to an hourly station-by-time matrix on `grid`.
+
+    Missing hours stay empty. AirData.kz already publishes one value per
+    station-hour; median only applies if that file ever contains a duplicate.
+    """
     if long_df.empty:
         return pd.DataFrame(index=grid)
     df = long_df.copy()
-    df = df[(df["value"] >= 0) & (df["value"] <= value_max)]
-    if df.empty:
-        return pd.DataFrame(index=grid)
     df["time"] = df["time"].dt.floor("h")
     panel = df.pivot_table(index="time", columns="station", values="value", aggfunc="median")
     return panel.reindex(grid)
@@ -140,105 +141,57 @@ def station_metadata(long_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def select_stations(
-    panel: pd.DataFrame,
+    panels: dict[str, pd.DataFrame],
     meta: pd.DataFrame,
-    min_coverage: float,
-    max_stations: int,
-    dedup_decimals: int,
+    hours: int,
 ) -> tuple[list[str], pd.DataFrame]:
-    """Keep well-observed, spatially distinct stations, best-covered first."""
-    coverage = panel.notna().mean().sort_values(ascending=False)
+    """Keep every station that reported at least one value."""
     meta = meta.set_index("station")
+    pm25 = panels.get("pm25")
+    counts: dict[str, int] = {}
+    for panel in panels.values():
+        measured = panel.notna().sum()
+        for station, n in measured.items():
+            if int(n) <= 0 or station not in meta.index:
+                continue
+            counts[station] = counts.get(station, 0) + int(n)
 
-    kept: list[str] = []
-    seen_coords: set[tuple[float, float]] = set()
+    kept = sorted(counts, key=lambda station: (-counts[station], station))
     rows = []
-    for station, cov in coverage.items():
-        if station not in meta.index:
-            continue
-        lat = round(float(meta.loc[station, "latitude"]), dedup_decimals)
-        lon = round(float(meta.loc[station, "longitude"]), dedup_decimals)
-        reason = None
-        if cov < min_coverage:
-            reason = "below min_coverage"
-        elif (lat, lon) in seen_coords:
-            reason = "duplicate coordinate"
-        elif len(kept) >= max_stations:
-            reason = "max_stations reached"
-
+    for station in kept:
+        if pm25 is not None and station in pm25.columns:
+            pm25_coverage = float(pm25[station].notna().mean())
+        else:
+            pm25_coverage = 0.0
         rows.append(
             {
                 "station": station,
-                "coverage": round(float(cov), 4),
+                "readings": counts[station],
+                "pm25_coverage": round(pm25_coverage, 4),
                 "source": meta.loc[station, "source"],
-                "kept": reason is None,
-                "reason": reason,
+                "kept": True,
             }
         )
-        if reason is None:
-            kept.append(station)
-            seen_coords.add((lat, lon))
-
+    if hours <= 0:
+        raise RuntimeError("The target window has no hours.")
     return kept, pd.DataFrame(rows)
 
 
-def impute_panel(panel: pd.DataFrame, short_gap: int) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """
-    Fill every cell, escalating from local to spatial to climatological
-    evidence, and report how much of the panel each stage accounts for.
-    """
+def coverage_report(panel: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Count reported cells. Missing hours are left empty."""
     observed = panel.notna()
     total = int(observed.size)
-    filled = panel.copy()
-
-    filled = filled.interpolate(method="time", limit=short_gap, limit_area="inside")
-    after_interp = filled.notna()
-
-    city = panel.median(axis=1)
-    city = city.interpolate(method="time", limit=24, limit_area="inside")
-
-    ratios = {}
-    for station in panel.columns:
-        ratio = (panel[station] / city).replace([np.inf, -np.inf], np.nan).median()
-        ratios[station] = float(ratio) if np.isfinite(ratio) and ratio > 0 else 1.0
-
-    for station in panel.columns:
-        need = filled[station].isna() & city.notna()
-        filled.loc[need, station] = city[need] * ratios[station]
-    after_spatial = filled.notna()
-
-    month = panel.index.month
-    hour = panel.index.hour
-    global_median = float(np.nanmedian(panel.values))
-    city_clim = pd.Series(panel.median(axis=1).values, index=panel.index).groupby([month, hour]).median()
-
-    for station in panel.columns:
-        need = filled[station].isna()
-        if not need.any():
-            continue
-        clim = panel[station].groupby([month, hour]).median()
-        keys = list(zip(month[need], hour[need]))
-        values = [
-            clim.get(key, np.nan) if np.isfinite(clim.get(key, np.nan)) else city_clim.get(key, np.nan)
-            for key in keys
-        ]
-        values = [v if np.isfinite(v) else global_median for v in values]
-        filled.loc[need, station] = values
-
-    filled = filled.clip(lower=0.0)
-
+    measured = int(observed.to_numpy().sum())
     report = {
         "cells_total": total,
-        "cells_measured": int(observed.values.sum()),
-        "cells_filled_by_interpolation": int(after_interp.values.sum() - observed.values.sum()),
-        "cells_filled_by_spatial": int(after_spatial.values.sum() - after_interp.values.sum()),
-        "cells_filled_by_climatology": int(total - after_spatial.values.sum()),
-        "measured_fraction": round(float(observed.values.mean()), 4),
-        "station_ratio_to_city_median": {k: round(v, 4) for k, v in ratios.items()},
+        "cells_measured": measured,
+        "cells_missing": total - measured,
+        "measured_fraction": round(measured / total, 4) if total else 0.0,
+        "station_measured_fraction": {
+            station: round(float(observed[station].mean()), 4) for station in panel.columns
+        },
     }
-    if filled.isna().to_numpy().any():
-        raise RuntimeError("Imputation left NaN values; the panel cannot be consumed as-is.")
-    return filled, observed, report
+    return observed, report
 
 
 def fetch_meteo(
@@ -293,7 +246,6 @@ def fetch_meteo(
             for api_name, out_name in METEO_VARS.items():
                 met[out_name] = hourly[api_name]
             met = met.set_index("time").reindex(grid)
-            met = met.interpolate(method="time", limit_direction="both")
             met.index.name = "time"
             met.to_csv(cache_dir / f"{row.station}.csv")
             frames[row.station] = met
@@ -360,7 +312,12 @@ def _request_with_backoff(params: dict, label: str, max_attempts: int = 6):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base_dir", type=str, default=str(Path(__file__).resolve().parent / "Oskemen"))
-    parser.add_argument("--start", type=str, default="2023-01-01")
+    parser.add_argument(
+        "--start",
+        type=str,
+        default=None,
+        help="First hour (UTC). Default: first timestamp in the fetched PM2.5 file.",
+    )
     parser.add_argument(
         "--end",
         type=str,
@@ -368,30 +325,19 @@ def main() -> None:
         help="Last hour (UTC). Default: last timestamp in the fetched PM2.5 file.",
     )
     parser.add_argument(
-        "--min_coverage",
-        type=float,
-        default=0.50,
-        help="Minimum fraction of hours a station must actually measure.",
-    )
-    parser.add_argument("--max_stations", type=int, default=20)
-    parser.add_argument("--min_stations", type=int, default=4)
-    parser.add_argument("--short_gap", type=int, default=6, help="Hours of gap still filled by time interpolation.")
-    parser.add_argument(
         "--parameters",
         type=str,
         nargs="*",
         default=None,
         help="Pollutants to include. Default: every airdatakz_oskemen_*.csv.gz in raw/.",
     )
-    parser.add_argument("--pm25_max", type=float, default=1000.0, help="PM2.5 readings above this are treated as artifacts.")
-    parser.add_argument("--dedup_decimals", type=int, default=3)
     parser.add_argument("--meteo_batch", type=int, default=5)
     parser.add_argument("--meteo_pause", type=float, default=1.0)
     args = parser.parse_args()
 
     base_dir = Path(args.base_dir).resolve()
     raw_dir = base_dir / "raw"
-    start = pd.Timestamp(args.start)
+    start = pd.Timestamp(args.start) if args.start else first_timestamp(raw_dir)
     end = pd.Timestamp(args.end) if args.end else last_timestamp(raw_dir)
     if end < start:
         raise SystemExit(f"Empty window: start {start} is after end {end}.")
@@ -404,53 +350,40 @@ def main() -> None:
         raise FileNotFoundError(
             f"No airdatakz_oskemen_*.csv.gz files in {raw_dir}. Run dataset/fetch_oskemen_raw.py first."
         )
-    if "pm25" not in param_codes:
-        raise FileNotFoundError(
-            f"{raw_dir / 'airdatakz_oskemen_pm25.csv.gz'} missing. "
-            "Station selection uses PM2.5; fetch that parameter first."
-        )
     print(f"Pollutants: {', '.join(PARAM_COLUMNS[c] for c in param_codes)}")
 
-    pm25 = load_parameter(raw_dir, "pm25", start, end)
-    print(f"KazHydroMet PM2.5: {len(pm25):>8d} readings, {pm25.station.nunique():3d} stations")
+    long_by_code = {code: load_parameter(raw_dir, code, start, end) for code in param_codes}
+    panels = {code: build_panel(long_df, grid) for code, long_df in long_by_code.items()}
+    meta = station_metadata(pd.concat(long_by_code.values(), ignore_index=True))
+    kept, selection = select_stations(panels, meta, len(grid))
+    if not kept:
+        raise SystemExit("No station reported a value in the target window.")
 
-    panel = build_panel(pm25, grid, args.pm25_max)
-    meta = station_metadata(pm25)
-    print(f"PM2.5 panel: {panel.shape[0]} hours x {panel.shape[1]} stations\n")
-
-    kept, selection = select_stations(panel, meta, args.min_coverage, args.max_stations, args.dedup_decimals)
-    print(f"Selected {len(kept)} stations at PM2.5 coverage >= {args.min_coverage:.0%}:")
-    for row in selection[selection.kept].itertuples(index=False):
-        print(f"  {row.station:<20s} {row.source:<12s} coverage={row.coverage:.3f}")
-    if len(kept) < args.min_stations:
-        raise SystemExit(
-            f"Only {len(kept)} stations clear --min_coverage {args.min_coverage}. "
-            f"Lower the threshold or narrow the window."
+    print(f"\nKeeping all {len(kept)} stations that reported at least one value:")
+    for row in selection.itertuples(index=False):
+        print(
+            f"  {row.station:<20s} {row.source:<12s} "
+            f"readings={row.readings:<7d} PM2.5={row.pm25_coverage:.2%}"
         )
 
     stations = meta[meta.station.isin(kept)].copy()
     stations["_order"] = stations["station"].map({s: i for i, s in enumerate(kept)})
     stations = stations.sort_values("_order").drop(columns="_order").reset_index(drop=True)
 
-    filled_by_param: dict[str, pd.DataFrame] = {}
     observed_by_param: dict[str, pd.DataFrame] = {}
-    impute_reports: dict[str, dict] = {}
+    coverage_reports: dict[str, dict] = {}
     used_codes: list[str] = []
 
-    print("\nFilling pollutant gaps...")
+    print("\nAligning measured pollutant values (gaps left empty)...")
     for code in param_codes:
         col = PARAM_COLUMNS[code]
-        if code == "pm25":
-            long_df = pm25
-            value_max = args.pm25_max
-        else:
-            long_df = load_parameter(raw_dir, code, start, end)
-            value_max = PARAM_MAX[code]
-        param_panel = build_panel(long_df, grid, value_max)
+        long_df = long_by_code[code]
+        param_panel = panels[code]
         for station in kept:
             if station not in param_panel.columns:
                 param_panel[station] = np.nan
         param_panel = param_panel[kept]
+        panels[code] = param_panel
         n_meas = int(param_panel.notna().to_numpy().sum())
         print(
             f"  {col:<6s} {len(long_df):>8d} readings, "
@@ -459,16 +392,10 @@ def main() -> None:
         if n_meas == 0:
             print(f"    skip {col}: no readings in the target window")
             continue
-        filled, observed, impute_report = impute_panel(param_panel, args.short_gap)
-        print(
-            f"    measured {impute_report['measured_fraction']:.1%} | "
-            f"interpolated {impute_report['cells_filled_by_interpolation']} | "
-            f"spatial {impute_report['cells_filled_by_spatial']} | "
-            f"climatology {impute_report['cells_filled_by_climatology']}"
-        )
-        filled_by_param[col] = filled
+        observed, report = coverage_report(param_panel)
+        print(f"    measured {report['measured_fraction']:.1%}, missing {report['cells_missing']}")
         observed_by_param[col] = observed
-        impute_reports[col] = impute_report
+        coverage_reports[col] = report
         used_codes.append(code)
 
     pollutant_cols = [PARAM_COLUMNS[c] for c in used_codes]
@@ -487,13 +414,12 @@ def main() -> None:
     for station in kept:
         met = meteo[station].reindex(grid)
         out = pd.DataFrame({"time": grid})
-        for col in pollutant_cols:
-            out[col] = np.round(filled_by_param[col][station].reindex(grid).to_numpy(), 3)
+        for code in used_codes:
+            col = PARAM_COLUMNS[code]
+            out[col] = panels[code][station].reindex(grid).to_numpy()
         for col in METEO_COLUMNS:
             out[col] = met[col].to_numpy()
         out = out[output_columns]
-        if out.isna().to_numpy().any():
-            raise RuntimeError(f"{station}: NaN survived assembly.")
         out["time"] = out["time"].dt.strftime("%Y-%m-%d %H:%M:%S")
         out.to_csv(stations_dir / f"{station}.csv", index=False)
 
@@ -518,12 +444,10 @@ def main() -> None:
         "stations_selected": len(kept),
         "stations": station_csv.to_dict(orient="records"),
         "selection": selection.to_dict(orient="records"),
-        "imputation": impute_reports,
+        "coverage": coverage_reports,
         "settings": {
-            "min_coverage": args.min_coverage,
-            "max_stations": args.max_stations,
-            "short_gap_hours": args.short_gap,
-            "pm25_max": args.pm25_max,
+            "station_filter": "every station with at least one reported value",
+            "gaps": "left empty",
         },
     }
     (base_dir / "build_report.json").write_text(json.dumps(report, indent=2, default=str))

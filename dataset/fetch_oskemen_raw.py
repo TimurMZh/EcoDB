@@ -247,7 +247,7 @@ def main() -> None:
         print("Warning: no files written. Check the network or widen --radius_km.")
         raise SystemExit(1)
     if "pm25" not in args.parameters:
-        print("Note: build_oskemen_stations.py selects stations using PM2.5.")
+        print("Note: the station-file window defaults to the first and last PM2.5 hour.")
 
 
 if __name__ == "__main__":

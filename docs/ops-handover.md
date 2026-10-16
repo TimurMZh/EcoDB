@@ -43,12 +43,15 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 Четыре представления регистрируются как Query Layer. У каждого есть уникальное поле `objectid` (bigint) и столбец `geom` типа Point, EPSG:4326. `NULL` в `geom` допустим.
 
 
-| Представление                | Строка                                       | Поле уникальности            |
-| ---------------------------- | -------------------------------------------- | ---------------------------- |
-| `eco.vw_results_flat`        | один результат                               | `objectid` = `result_id`     |
-| `eco.vw_exceedances_summary` | результат × норматив                         | `objectid` = `exceedance_id` |
-| `eco.vw_latest_results`      | последний результат пары (точка, показатель) | `objectid` = `result_id`     |
-| `eco.vw_water_levels`        | замер уровня воды                            | `objectid` = `level_id`      |
+| Представление                  | Строка                                                        | Поле уникальности                         |
+| ------------------------------ | ------------------------------------------------------------- | ----------------------------------------- |
+| `eco.vw_results_flat`          | лабораторный результат (без автостанций)                      | `objectid` = `result_id`                  |
+| `eco.vw_exceedances_summary`   | результат × норматив                                          | `objectid` = `exceedance_id`              |
+| `eco.vw_latest_results`        | последний лабораторный результат пары (точка, показатель)     | `objectid` = `result_id`                  |
+| `eco.vw_water_levels`          | замер уровня воды                                             | `objectid` = `level_id`                   |
+| `eco.vw_sensor_latest`         | последнее почасовое значение автостанции (точка × показатель) | `objectid` = `result_id`                  |
+| `eco.vw_sensor_latest_wide`    | одна строка на автостанцию, последние µg/m³ и метео           | `objectid` = `point_id`                   |
+| `eco.vw_sensor_daily`          | сутки UTC: min/avg/max + среднее метео                        | `objectid` = точка × показатель × дата    |
 
 
 `vw_latest_results` не содержит коды QC `D` и `R`. Сейчас это 720 строк HCN, у которых пустая ячейка Excel была записана как «не обн.».
@@ -56,14 +59,14 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 Порядок в ArcGIS Pro:
 
 1. Новое подключение к базе: PostgreSQL, пользователь `eco_gis`.
-2. Добавить Query Layer. Запрос: `SELECT * FROM eco.vw_results_flat` (и то же для остальных трёх представлений).
+2. Добавить Query Layer. Запрос: `SELECT * FROM eco.vw_results_flat` (лаборатория) и `SELECT * FROM eco.vw_sensor_latest_wide` (карта автостанций, последние значения). То же для остальных представлений из таблицы.
 3. Уникальное поле: `objectid`. Проверить слой.
 4. Если система координат не подхватилась из PostGIS, указать WGS 1984 (EPSG:4326).
 5. Опубликовать слой на ArcGIS Enterprise (карта, Feature Layer или Query Layer — по принятой у заказчика схеме портала).
 
 `objectid` имеет тип bigint. ArcGIS Pro 2.9 и Enterprise 10.9.1 понимают 64-битный идентификатор. На текущих объёмах значения помещаются и в 32-битный integer.
 
-Пока у всех точек `geom` пустой, слой регистрируется, но на карте не рисуется. Координаты появятся после каталога точек (долгота, широта, код точки) и обновления `eco.monitoring_points.geom`. Повторно публиковать определение слоя не нужно: геометрия читается из той же вьюхи.
+У лабораторных точек `Т-1`…`Т-30` `geom` пустой, пока нет каталога координат. У 13 автостанций `kgmt_*` геометрия заполняется загрузчиком `etl/load_oskemen_stations.py`. Повторно публиковать определение слоя не нужно: геометрия читается из той же вьюхи.
 
 `vw_water_levels` пустая: замеров уровня в исходных файлах нет.
 

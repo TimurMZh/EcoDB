@@ -1,6 +1,6 @@
 # EcoDB entity-relationship diagram
 
-Physical model of schema `eco` (PostgreSQL / PostGIS). Source: `sql/migrations/002_tables.sql`.
+Physical model of schema `eco` (PostgreSQL / PostGIS). Source: `sql/migrations/002_tables.sql` and `012_oskemen_stations.sql`.
 
 Cardinalities follow declared foreign keys. `staging_lab_import` and `attachments` have no FKs (staging is a raw snapshot; attachments are polymorphic).
 
@@ -36,6 +36,7 @@ erDiagram
     sampling_events |o--o{ field_measurements : "during"
     parameters ||--o{ field_measurements : "measured"
     monitoring_points ||--o{ water_levels : "at"
+    monitoring_points ||--o{ meteo_observations : "weather"
 
     sites {
         bigint site_id PK
@@ -162,6 +163,17 @@ erDiagram
         numeric water_elevation_m
     }
 
+    meteo_observations {
+        bigint meteo_id PK
+        bigint point_id FK
+        timestamptz observed_at
+        numeric temperature
+        numeric pressure
+        numeric humidity
+        numeric wind_speed
+        numeric wind_direction
+    }
+
     ref_media_types {
         text media_code PK
         text name_ru
@@ -205,6 +217,7 @@ erDiagram
 | Results | `results`, `result_exceedances`, `ref_qc_codes` |
 | NSI / PDK | `parameters`, `parameter_aliases`, `guideline_standards`, `guideline_values` |
 | Field | `field_measurements`, `water_levels` |
+| Sensor | `meteo_observations`; hourly pollutants live in `samples` (`sample_type = hourly_sensor`) + `results` |
 | Other | `ref_media_types`, `attachments`, `staging_lab_import` |
 
 ## Notes
@@ -214,4 +227,6 @@ erDiagram
 - Unique on `guideline_values`: `(standard_id, param_id, media_type, valid_from)`.
 - `attachments.entity_type` is one of: `site`, `monitoring_point`, `sampling_event`, `sample`, `result`, `laboratory`.
 - `staging_lab_import` is loaded first, then `fn_process_staging_import()` writes into events / samples / results.
-- Views (`vw_results_flat`, `vw_exceedances_summary`, `vw_latest_results`, `vw_water_levels`) are not entities; they are Query Layer projections over this model.
+- Hourly KazHydroMet values are `samples.sample_type = 'hourly_sensor'` (one sample per station-hour) and `results` in `ug/m3`. Empty source cells are not stored. Lab Query Layers exclude this sample type.
+- `meteo_observations` has no FK to `samples`. Join on `meteo.point_id = sampling_events.point_id` and `meteo.observed_at = samples.collection_datetime` (`vw_sensor_hourly`, `vw_sensor_latest`).
+- Views (`vw_results_flat`, `vw_exceedances_summary`, `vw_latest_results`, `vw_water_levels`, `vw_sensor_latest`, `vw_sensor_latest_wide`, `vw_sensor_daily`) are not entities; they are Query Layer projections over this model.
