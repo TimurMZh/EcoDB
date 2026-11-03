@@ -1,42 +1,42 @@
-# EcoDB entity-relationship diagram
+# Диаграмма сущность–связь EcoDB
 
-Physical model of schema `eco` (PostgreSQL / PostGIS). Source: `sql/migrations/002_tables.sql` and `012_oskemen_stations.sql`.
+Физическая модель схемы `eco` (PostgreSQL / PostGIS). Источник: `sql/migrations/002_tables.sql` и `012_oskemen_stations.sql`.
 
-Cardinalities follow declared foreign keys. `staging_lab_import` and `attachments` have no FKs (staging is a raw snapshot; attachments are polymorphic).
+Мощности связей следуют объявленным внешним ключам. У `staging_lab_import` и `attachments` внешних ключей нет: staging — сырой снимок, вложения полиморфны.
 
 ```mermaid
 erDiagram
-    sites ||--o{ monitoring_points : "has"
-    ref_media_types ||--o{ monitoring_points : "media"
-    monitoring_points ||--o{ point_aliases : "aka"
+    sites ||--o{ monitoring_points : "имеет"
+    ref_media_types ||--o{ monitoring_points : "среда"
+    monitoring_points ||--o{ point_aliases : "синоним"
 
-    sites ||--o{ sampling_events : "hosts"
-    monitoring_points ||--o{ sampling_events : "at"
-    ref_media_types ||--o{ sampling_events : "media"
+    sites ||--o{ sampling_events : "размещает"
+    monitoring_points ||--o{ sampling_events : "на точке"
+    ref_media_types ||--o{ sampling_events : "среда"
 
-    sampling_events ||--o{ samples : "collects"
-    laboratories |o--o{ samples : "analyzes"
+    sampling_events ||--o{ samples : "отбирает"
+    laboratories |o--o{ samples : "анализирует"
 
-    samples ||--o{ results : "has"
-    parameters ||--o{ results : "measured"
+    samples ||--o{ results : "имеет"
+    parameters ||--o{ results : "измерен"
     ref_qc_codes |o--o{ results : "qc"
 
-    results ||--o{ result_exceedances : "flagged"
-    guideline_values ||--o{ result_exceedances : "against"
-    guideline_standards ||--o{ result_exceedances : "standard"
+    results ||--o{ result_exceedances : "отмечено"
+    guideline_values ||--o{ result_exceedances : "по нормативу"
+    guideline_standards ||--o{ result_exceedances : "стандарт"
 
-    parameters ||--o{ parameter_aliases : "aka"
-    parameters ||--o{ guideline_values : "limit for"
-    guideline_standards ||--o{ guideline_values : "defines"
-    ref_media_types ||--o{ guideline_values : "media"
-    ref_media_types |o--o{ parameters : "primary media"
-    ref_media_types |o--o{ guideline_standards : "media"
+    parameters ||--o{ parameter_aliases : "синоним"
+    parameters ||--o{ guideline_values : "предел для"
+    guideline_standards ||--o{ guideline_values : "задаёт"
+    ref_media_types ||--o{ guideline_values : "среда"
+    ref_media_types |o--o{ parameters : "основная среда"
+    ref_media_types |o--o{ guideline_standards : "среда"
 
-    monitoring_points ||--o{ field_measurements : "at"
-    sampling_events |o--o{ field_measurements : "during"
-    parameters ||--o{ field_measurements : "measured"
-    monitoring_points ||--o{ water_levels : "at"
-    monitoring_points ||--o{ meteo_observations : "weather"
+    monitoring_points ||--o{ field_measurements : "на точке"
+    sampling_events |o--o{ field_measurements : "во время"
+    parameters ||--o{ field_measurements : "измерен"
+    monitoring_points ||--o{ water_levels : "на точке"
+    monitoring_points ||--o{ meteo_observations : "погода"
 
     sites {
         bigint site_id PK
@@ -83,7 +83,7 @@ erDiagram
     samples {
         bigint sample_id PK
         bigint event_id FK
-        bigint lab_id FK "nullable"
+        bigint lab_id FK "может быть NULL"
         text sample_code
         text sample_type
         timestamptz collection_datetime
@@ -95,7 +95,7 @@ erDiagram
         text param_code UK
         text name_ru
         text unit
-        text media_type FK "nullable"
+        text media_type FK "может быть NULL"
         numeric mdl_default
     }
 
@@ -111,7 +111,7 @@ erDiagram
         text standard_code UK
         text name_ru
         text authority
-        text media_type FK "nullable"
+        text media_type FK "может быть NULL"
     }
 
     guideline_values {
@@ -132,7 +132,7 @@ erDiagram
         numeric result_value
         boolean less_than
         numeric mdl
-        char qc_code FK "nullable"
+        char qc_code FK "может быть NULL"
     }
 
     result_exceedances {
@@ -148,7 +148,7 @@ erDiagram
     field_measurements {
         bigint measurement_id PK
         bigint point_id FK
-        bigint event_id FK "nullable"
+        bigint event_id FK "может быть NULL"
         bigint param_id FK
         timestamptz measured_datetime
         numeric result_value
@@ -189,7 +189,7 @@ erDiagram
 
     attachments {
         bigint attachment_id PK
-        text entity_type "polymorphic"
+        text entity_type "полиморфная связь"
         bigint entity_id
         text file_name
         text file_uri
@@ -208,25 +208,25 @@ erDiagram
     }
 ```
 
-## Subject areas
+## Предметные области
 
-| Area | Tables |
+| Область | Таблицы |
 |---|---|
-| Spatial | `sites`, `monitoring_points`, `point_aliases` |
-| Sampling | `laboratories`, `sampling_events`, `samples` |
-| Results | `results`, `result_exceedances`, `ref_qc_codes` |
-| NSI / PDK | `parameters`, `parameter_aliases`, `guideline_standards`, `guideline_values` |
-| Field | `field_measurements`, `water_levels` |
-| Sensor | `meteo_observations`; hourly pollutants live in `samples` (`sample_type = hourly_sensor`) + `results` |
-| Other | `ref_media_types`, `attachments`, `staging_lab_import` |
+| Пространство | `sites`, `monitoring_points`, `point_aliases` |
+| Отбор проб | `laboratories`, `sampling_events`, `samples` |
+| Результаты | `results`, `result_exceedances`, `ref_qc_codes` |
+| НСИ / ПДК | `parameters`, `parameter_aliases`, `guideline_standards`, `guideline_values` |
+| Поле | `field_measurements`, `water_levels` |
+| Датчики | `meteo_observations`; почасовые загрязнители лежат в `samples` (`sample_type = hourly_sensor`) и `results` |
+| Прочее | `ref_media_types`, `attachments`, `staging_lab_import` |
 
-## Notes
+## Примечания
 
-- Unique on `sampling_events`: `(point_id, event_date, media_type)`.
-- Unique on `results`: `(sample_id, param_id)` — re-import updates the row.
-- Unique on `guideline_values`: `(standard_id, param_id, media_type, valid_from)`.
-- `attachments.entity_type` is one of: `site`, `monitoring_point`, `sampling_event`, `sample`, `result`, `laboratory`.
-- `staging_lab_import` is loaded first, then `fn_process_staging_import()` writes into events / samples / results.
-- Hourly KazHydroMet values are `samples.sample_type = 'hourly_sensor'` (one sample per station-hour) and `results` in `ug/m3`. Empty source cells are not stored. Lab Query Layers exclude this sample type.
-- `meteo_observations` has no FK to `samples`. Join on `meteo.point_id = sampling_events.point_id` and `meteo.observed_at = samples.collection_datetime` (`vw_sensor_hourly`, `vw_sensor_latest`).
-- Views (`vw_results_flat`, `vw_exceedances_summary`, `vw_latest_results`, `vw_water_levels`, `vw_sensor_latest`, `vw_sensor_latest_wide`, `vw_sensor_daily`) are not entities; they are Query Layer projections over this model.
+- Уникальность `sampling_events`: `(point_id, event_date, media_type)`.
+- Уникальность `results`: `(sample_id, param_id)` — повторный импорт обновляет строку.
+- Уникальность `guideline_values`: `(standard_id, param_id, media_type, valid_from)`.
+- `attachments.entity_type` — одно из: `site`, `monitoring_point`, `sampling_event`, `sample`, `result`, `laboratory`.
+- Сначала загружается `staging_lab_import`, затем `fn_process_staging_import()` пишет в события, пробы и результаты.
+- Почасовые значения Казгидромета — это `samples.sample_type = 'hourly_sensor'` (одна проба на станцию и час) и `results` в `ug/m3`. Пустые ячейки источника не хранятся. Лабораторные Query Layer этот тип пробы исключают.
+- У `meteo_observations` нет внешнего ключа на `samples`. Соединение: `meteo.point_id = sampling_events.point_id` и `meteo.observed_at = samples.collection_datetime` (`vw_sensor_hourly`, `vw_sensor_latest`).
+- Представления (`vw_results_flat`, `vw_exceedances_summary`, `vw_latest_results`, `vw_water_levels`, `vw_sensor_latest`, `vw_sensor_latest_wide`, `vw_sensor_daily`) сущностями не являются: это проекции Query Layer поверх этой модели.

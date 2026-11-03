@@ -1,68 +1,68 @@
-# Backups
+# Резервные копии
 
-Weekly logical backup of `eco_monitoring`, copies kept off the database server, and a restore test once a quarter.
+Еженедельная логическая копия `eco_monitoring`, копии хранятся вне сервера базы, проверка восстановления — раз в квартал.
 
-The database runs in Docker: container `eco-postgis`, image `postgis/postgis:14-3.4`. Live data is the Docker volume `eco_pgdata`. A dump on that same disk is not a backup.
+База работает в Docker: контейнер `eco-postgis`, образ `postgis/postgis:14-3.4`. Рабочие данные — том Docker `eco_pgdata`. Дамп на том же диске резервной копией не является.
 
-`docs/data-requirements.md` still lists a daily dump and 30 days of copies as not yet agreed. This note is the weekly procedure.
+В `docs/data-requirements.md` ежедневный дамп и хранение копий 30 дней всё ещё помечены как не согласованные. Эта записка — еженедельный порядок.
 
-## What is saved
+## Что сохраняется
 
-| File | Command | Contents |
+| Файл | Команда | Содержимое |
 | --- | --- | --- |
-| `eco_monitoring_YYYYMMDD.dump` | `pg_dump -Fc` | Database `eco_monitoring` (schema `eco`, data, views) |
-| `eco_globals_YYYYMMDD.sql` | `pg_dumpall --globals-only` | Logins and roles (`eco_admin`, `eco_etl`, `eco_gis`, and the rest) |
+| `eco_monitoring_YYYYMMDD.dump` | `pg_dump -Fc` | База `eco_monitoring` (схема `eco`, данные, представления) |
+| `eco_globals_YYYYMMDD.sql` | `pg_dumpall --globals-only` | Логины и роли (`eco_admin`, `eco_etl`, `eco_gis` и остальные) |
 
-Custom format (`-Fc`) is restored with `pg_restore`. Without the globals file, a restore has no logins.
+Пользовательский формат (`-Fc`) восстанавливается через `pg_restore`. Без файла глобальных объектов у восстановленной базы нет логинов.
 
-`pg_dump` does not include files outside the database. If `DB_input\` (Excel and PDF sources) exists only on this server, copy that folder with the same weekly job.
+`pg_dump` не включает файлы вне базы. Если `DB_input\` (исходные Excel и PDF) есть только на этом сервере, копируйте эту папку тем же еженедельным заданием.
 
-## Where copies live
+## Где лежат копии
 
-| Place | Role | How long |
+| Место | Роль | Как долго |
 | --- | --- | --- |
-| `D:\eco-backups\staging` on the database server | Fresh dump, until the off-server copy is verified | Delete after a successful copy |
-| File share, NAS, or a second server (not this host) | Copies that are kept | 12 weekly dumps (about one quarter) |
+| `D:\eco-backups\staging` на сервере базы | свежий дамп, пока копия вне сервера не проверена | удалить после успешного копирования |
+| Файловый ресурс, NAS или второй сервер (не этот узел) | копии, которые хранятся | 12 еженедельных дампов (около одного квартала) |
 
-Twelve weeks is the retention so the quarterly test always has a real dump. The 30-day floor in `docs/data-requirements.md` is shorter than that.
+Срок в двенадцать недель нужен, чтобы квартальная проверка всегда имела настоящий дамп. Нижняя граница в 30 дней из `docs/data-requirements.md` короче.
 
-## Weekly dump
+## Еженедельный дамп
 
-The job is `scripts/backup.bat`. It runs on the database server, inside the container, as the bootstrap user `eco`. Sunday 02:00, when ETL is not loading.
+Задание — `scripts/backup.bat`. Оно выполняется на сервере базы, внутри контейнера, от начального пользователя `eco`. Воскресенье, 02:00, когда ETL ничего не загружает.
 
-On Windows, do not redirect `pg_dump -Fc` through PowerShell. `>` treats the stream as text and corrupts the file. The script writes the dump inside the container, then `docker cp` copies it out. The date stamp comes from PowerShell; the dump itself does not.
+В Windows не перенаправляйте `pg_dump -Fc` через PowerShell. `>` считает поток текстом и портит файл. Скрипт пишет дамп внутри контейнера, затем `docker cp` копирует его наружу. Метка даты берётся из PowerShell; сам дамп — нет.
 
-Set `SHARE` at the top of `scripts/backup.bat` to the off-server folder before the first run. `docker exec` uses the container's local socket, so the script does not store a password.
+Перед первым запуском задайте `SHARE` в начале `scripts/backup.bat`: это папка вне сервера. `docker exec` использует локальный сокет контейнера, поэтому скрипт пароль не хранит.
 
-Register it once on the server, from an Administrator prompt:
+Зарегистрируйте задание один раз на сервере из командной строки администратора:
 
 ```bat
 scripts\install-backup-task.bat
 ```
 
-That creates the task **EcoDB weekly backup**: every Sunday at 02:00, account `SYSTEM`, including when nobody is logged on. `SYSTEM` must be able to run `docker` and write `D:\eco-backups`. If the server is off at 02:00, the task starts when it is next available. A failed run exits 1, leaves the staging files in place, and appends a line to `D:\eco-backups\backup.log`.
+Создаётся задача **EcoDB weekly backup**: каждое воскресенье в 02:00, учётная запись `SYSTEM`, в том числе когда никто не вошёл в систему. `SYSTEM` должна уметь запускать `docker` и писать в `D:\eco-backups`. Если в 02:00 сервер выключен, задача стартует, когда он снова доступен. Неудачный запуск завершается с кодом 1, оставляет файлы в staging и дописывает строку в `D:\eco-backups\backup.log`.
 
-## Copy off the database server
+## Копия вне сервера базы
 
-After the checksum, the script copies that week's dump, globals file, and `.sha256` files to `SHARE`. It recomputes SHA256 on the share and compares it with the `.sha256` file. On a match it deletes the staging copies. On a mismatch it removes the share copies of that week and leaves staging in place.
+После контрольной суммы скрипт копирует дамп этой недели, файл глобальных объектов и файлы `.sha256` в `SHARE`. Он заново считает SHA256 на ресурсе и сравнивает с файлом `.sha256`. При совпадении удаляет копии в staging. При расхождении удаляет копии этой недели на ресурсе и оставляет staging на месте.
 
-It then deletes files on the share older than 84 days (12 weeks): `eco_monitoring_*.dump`, `eco_globals_*.sql`, and their `.sha256` files.
+Затем удаляет на ресурсе файлы старше 84 дней (12 недель): `eco_monitoring_*.dump`, `eco_globals_*.sql` и их файлы `.sha256`.
 
-## Recovery test, once a quarter
+## Проверка восстановления, раз в квартал
 
-Do this in the first week of each quarter, on a machine that is not the production database server. Use the newest dump from the share. Do not restore over `eco-postgis`.
+Делайте это в первую неделю каждого квартала на машине, которая не является промышленным сервером базы. Берите самый новый дамп с ресурса. Не восстанавливайте поверх `eco-postgis`.
 
-1. Copy that week's `.dump`, `.sql`, and `.sha256` to the test machine and check the checksum.
-2. Start an empty database with the same image:
+1. Скопируйте `.dump`, `.sql` и `.sha256` этой недели на тестовую машину и проверьте контрольную сумму.
+2. Запустите пустую базу с тем же образом:
 
 ```bat
 docker run -d --name eco-restore-test -e POSTGRES_USER=eco -e POSTGRES_PASSWORD=restore-test -e POSTGRES_DB=eco_monitoring postgis/postgis:14-3.4
 docker exec eco-restore-test pg_isready -U eco -d eco_monitoring
 ```
 
-Wait until `pg_isready` accepts connections.
+Дождитесь, пока `pg_isready` примет подключения.
 
-3. Load roles, then the database. `--exit-on-error` stops on the first restore error:
+3. Загрузите роли, затем базу. `--exit-on-error` останавливается на первой ошибке восстановления:
 
 ```bat
 docker cp eco_globals_YYYYMMDD.sql eco-restore-test:/tmp/globals.sql
@@ -71,7 +71,7 @@ docker exec eco-restore-test psql -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f
 docker exec eco-restore-test pg_restore -U eco -d eco_monitoring --exit-on-error /tmp/eco.dump
 ```
 
-4. Check schema, row counts, the ArcGIS view, and PostGIS. Counts should match production at the time of the dump:
+4. Проверьте схему, числа строк, представление ArcGIS и PostGIS. Числа должны совпасть с промышленной базой на момент дампа:
 
 ```bat
 docker exec eco-restore-test psql -U eco -d eco_monitoring -c "SELECT version FROM eco.schema_migrations ORDER BY version;"
@@ -80,24 +80,24 @@ docker exec eco-restore-test psql -U eco -d eco_monitoring -c "SELECT COUNT(*) F
 docker exec eco-restore-test psql -U eco -d eco_monitoring -c "SELECT PostGIS_Version();"
 ```
 
-5. Append one line to a log kept with the backups: date, file name, checksum, `eco.results` count, pass or fail, person.
-6. Remove the test container:
+5. Допишите одну строку в журнал рядом с копиями: дата, имя файла, контрольная сумма, число `eco.results`, успех или неудача, кто проверял.
+6. Удалите тестовый контейнер:
 
 ```bat
 docker rm -f eco-restore-test
 ```
 
-A failed test means there is no confirmed backup yet. Fix the dump or the restore steps and run the test again before the next weekly job.
+Неудачная проверка означает, что подтверждённой копии ещё нет. Исправьте дамп или шаги восстановления и повторите проверку до следующего еженедельного задания.
 
-## Record
+## Учёт
 
-| Item | Value |
+| Пункт | Значение |
 | --- | --- |
-| Schedule | Weekly, Sunday 02:00, task **EcoDB weekly backup** (`scripts/install-backup-task.bat`) |
-| Script | `scripts/backup.bat` |
-| Database | `eco_monitoring` |
-| Format | `pg_dump -Fc` plus `pg_dumpall --globals-only` |
-| Retention | 12 weekly copies on a named share that is not the database server |
-| Staging | `D:\eco-backups\staging`, deleted after a verified copy |
-| Restore test | First week of each quarter, throwaway `postgis/postgis:14-3.4` container, log line as above |
-| Failure | Whoever runs the server is told when the scheduled task fails |
+| Расписание | еженедельно, воскресенье 02:00, задача **EcoDB weekly backup** (`scripts/install-backup-task.bat`) |
+| Скрипт | `scripts/backup.bat` |
+| База | `eco_monitoring` |
+| Формат | `pg_dump -Fc` и `pg_dumpall --globals-only` |
+| Срок хранения | 12 еженедельных копий на именованном ресурсе, который не является сервером базы |
+| Staging | `D:\eco-backups\staging`, удаляется после проверенной копии |
+| Проверка восстановления | первая неделя каждого квартала, одноразовый контейнер `postgis/postgis:14-3.4`, строка журнала как выше |
+| Сбой | тому, кто ведёт сервер, сообщают, когда плановая задача завершилась с ошибкой |

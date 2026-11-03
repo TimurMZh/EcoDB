@@ -1,8 +1,8 @@
-# QA/QC checks
+# Проверки QA/QC
 
-Checklist used by `python3 etl/phase4.py` (rules version `phase4-2026-09-22`).
+Перечень проверок, которые выполняет `python3 etl/phase4.py` (версия правил `phase4-2026-09-22`).
 
-Each run inserts one row in `eco.qa_runs`, writes findings to `eco.qa_findings`, writes the protocol sample to `eco.qa_spot_checks`, then sets `eco.results.qc_code` and `eco.results.qc_reason` through `eco.fn_apply_qc`. The numeric outcome of a run is `docs/qa_phase4_report.md`. This file is the list of checks, not that outcome.
+Каждый прогон вставляет одну строку в `eco.qa_runs`, записывает замечания в `eco.qa_findings`, выборку по протоколу — в `eco.qa_spot_checks`, затем проставляет `eco.results.qc_code` и `eco.results.qc_reason` через `eco.fn_apply_qc`. Числовой итог прогона — `docs/qa_phase4_report.md`. Этот файл — список проверок, а не этот итог.
 
 ```bash
 ./sql/apply.sh
@@ -10,83 +10,83 @@ python3 etl/phase4.py
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase4.sql
 ```
 
-`sql/verify_phase4.sql` fails the latest finished run when any finding has severity `error`, any result has no QC code, the random sample is under 5% of results, a protocol row has disposition `mismatch`, or an imputed HCN result is not coded `R`.
+`sql/verify_phase4.sql` отклоняет последний завершённый прогон, если у любого замечания уровень `error`, у результата нет кода QC, случайная выборка меньше 5% результатов, у строки протокола итог `mismatch` или импутированный результат HCN не получил код `R`.
 
-## Severity
+## Уровень
 
-| Severity | Meaning |
+| Уровень | Смысл |
 |---|---|
-| `error` | Integrity failure. The verify script rejects the run. |
-| `warning` | Loaded data is usable, but a known gap remains. |
-| `info` | Check completed and the count is explained. |
+| `error` | Нарушение целостности. Скрипт проверки отклоняет прогон. |
+| `warning` | Загруженные данные пригодны, но известный пробел остаётся. |
+| `info` | Проверка выполнена, число пояснено. |
 
-## 1. Integrity checks
+## 1. Проверки целостности
 
-Stored in `eco.qa_findings`. Implemented in `etl/qaqc.py` (`_integrity`).
+Хранятся в `eco.qa_findings`. Реализованы в `etl/qaqc.py` (`_integrity`).
 
-| Code | Severity when it fails | What is checked |
+| Код | Уровень при сбое | Что проверяется |
 |---|---|---|
-| `batch_reconciliation` | `error` if any staging row is neither accepted nor rejected; otherwise `info` | For each `batch_code` in `eco.staging_lab_import`: staged = accepted (`processed_at` set) + rejected (`process_error` set). Nothing is left without a status. |
-| `required_fields` | `error` if the count is not zero | Every result has a sampling date, a monitoring point, a parameter, and either `result_value` or `less_than`. |
-| `duplicate_results` | `error` if the count is not zero | No duplicate pair `(sample_id, param_id)` in `eco.results`. |
-| `duplicate_exceedances` | `error` if the count is not zero | No duplicate pair `(result_id, gv_id)` in `eco.result_exceedances`. |
-| `unit_mismatch` | `warning` if the count is not zero | `results.unit` equals `parameters.unit` after lowercasing and removing spaces. A mismatch also sets QC code `R` (see below). |
-| `missing_geom` | `warning` if any point has no geometry | Count of `eco.monitoring_points` with `geom IS NULL`. Does not change the result QC code. ArcGIS layers have no coordinates until a point catalogue arrives. |
-| `surface_ground_overlap` | `warning` if the count is not zero | Pairs `SW-n` / `GW-n` with the same parameter, the same sampling date, and the same value. Points stay separate. Does not change the QC code. |
-| `blank_quarters_skipped` | always `info` | Empty quarter cells in the surface and groundwater Excel reports. They are not inserted into staging. The finding records how many were skipped. |
+| `batch_reconciliation` | `error`, если есть строка staging, которая не принята и не отклонена; иначе `info` | Для каждого `batch_code` в `eco.staging_lab_import`: в staging = принято (`processed_at` задан) + отклонено (`process_error` задан). Строк без статуса не остаётся. |
+| `required_fields` | `error`, если число не ноль | У каждого результата есть дата отбора, точка, показатель и либо `result_value`, либо `less_than`. |
+| `duplicate_results` | `error`, если число не ноль | Нет повторяющейся пары `(sample_id, param_id)` в `eco.results`. |
+| `duplicate_exceedances` | `error`, если число не ноль | Нет повторяющейся пары `(result_id, gv_id)` в `eco.result_exceedances`. |
+| `unit_mismatch` | `warning`, если число не ноль | `results.unit` совпадает с `parameters.unit` после приведения к нижнему регистру и удаления пробелов. Расхождение также ставит код QC `R` (см. ниже). |
+| `missing_geom` | `warning`, если у точки нет геометрии | Число строк `eco.monitoring_points` с `geom IS NULL`. Код QC результата не меняется. У слоёв ArcGIS нет координат, пока не поступит каталог точек. |
+| `surface_ground_overlap` | `warning`, если число не ноль | Пары `SW-n` / `GW-n` с тем же показателем, той же датой отбора и тем же значением. Точки остаются раздельными. Код QC не меняется. |
+| `blank_quarters_skipped` | всегда `info` | Пустые ячейки кварталов в отчётах Excel по поверхностным и подземным водам. В staging они не вставляются. Замечание фиксирует, сколько пропущено. |
 
-Rejected staging rows (empty air values, groundwater «нет») are counted in `batch_reconciliation` and do not become results, so they receive no QC code.
+Отклонённые строки staging (пустые значения воздуха, «нет» в подземных водах) учитываются в `batch_reconciliation` и результатами не становятся, поэтому код QC им не присваивается.
 
-## 2. QC code rules
+## 2. Правила кодов QC
 
-Stored in `eco.qa_rules`. Applied to every row in `eco.results` by `eco.fn_apply_qc`. The first matching rule wins.
+Хранятся в `eco.qa_rules`. Применяются к каждой строке `eco.results` функцией `eco.fn_apply_qc`. Срабатывает первое подходящее правило.
 
-Codes `D` and `R` are excluded from `eco.vw_latest_results`. Code `D` (rejected) is defined in `eco.ref_qc_codes` but this runner does not assign it. Rows that fail parsing stay in staging.
+Коды `D` и `R` исключены из `eco.vw_latest_results`. Код `D` (отклонено) определён в `eco.ref_qc_codes`, но этот прогон его не назначает. Строки, которые не разобрались, остаются в staging.
 
-| Priority | Rule | Code | When it applies |
+| Приоритет | Правило | Код | Когда применяется |
 |---|---|---|---|
-| 1 | `protocol_mismatch` | R | This run's spot check says the PDF value and the loaded value differ. |
-| 2 | `protocol_match` | A | This run's spot check says the loaded value matches the PDF. |
-| 3 | `imputed_nondetect` | R | Staging `extra_json.imputed_nondetect` is true: a blank Excel cell was stored as «не обн.». Used for HCN in `AIR_PILOT`. |
-| 4 | `unit_mismatch` | R | Result unit differs from `parameters.unit`. |
-| 5 | `outlier_10x` | R | Not a non-detect, an active `GT`/`GTE` guideline applies on that date and medium, and `result_value` is greater than 10 × the limit. |
-| 6 | `below_mdl` | B | `less_than` is true and no rule above matched. The source itself reported `<`, `≤`, or «не обн.». |
-| 7 | `default_accept` | C | Numeric result with none of the rules above. |
+| 1 | `protocol_mismatch` | R | Выборочная сверка этого прогона: значение PDF и загруженное значение различаются. |
+| 2 | `protocol_match` | A | Выборочная сверка этого прогона: загруженное значение совпало с PDF. |
+| 3 | `imputed_nondetect` | R | В staging `extra_json.imputed_nondetect` истинно: пустая ячейка Excel записана как «не обн.». Используется для HCN в `AIR_PILOT`. |
+| 4 | `unit_mismatch` | R | Единица результата отличается от `parameters.unit`. |
+| 5 | `outlier_10x` | R | Это не «ниже МДО», на эту дату и среду действует норматив `GT`/`GTE`, и `result_value` больше 10 × предела. |
+| 6 | `below_mdl` | B | `less_than` истинно и ни одно правило выше не сработало. Источник сам указал `<`, `≤` или «не обн.». |
+| 7 | `default_accept` | C | Числовой результат, к которому не подошло ни одно правило выше. |
 
-`qc_reason` stores the winning rule code.
+`qc_reason` хранит код сработавшего правила.
 
-## 3. Protocol spot check
+## 3. Выборочная сверка с протоколом
 
-Stored in `eco.qa_spot_checks`. The only protocol file in `DB_input` is `Результаты мониторинга.pdf`. Numeric comparison tolerance is `0.0001`.
+Хранится в `eco.qa_spot_checks`. Единственный протокол в `DB_input` — `Результаты мониторинга.pdf`. Допуск числового сравнения — `0.0001`.
 
-### Protocol pass (`sample_kind = protocol`)
+### Проход по протоколу (`sample_kind = protocol`)
 
-Every air row on PDF pages 1–4 and every well row in table 9 (pages 5–6) is read again.
+Повторно читается каждая строка воздуха на страницах PDF 1–4 и каждая строка скважины в таблице 9 (страницы 5–6).
 
-| Disposition | Meaning |
+| Итог | Смысл |
 |---|---|
-| `match` | Same point and parameter, and the loaded value agrees. Air «не обн.» with no number is not matched to the Excel series, because the PDF has no sample date. |
-| `mismatch` | A groundwater well row exists in the database but the value differs. Sets QC code `R`. |
-| `not_in_db` | The protocol line has no loaded counterpart. Includes air «не обн.» without a date, and PDF cells that glue two parameter names into one. |
-| `unmapped` | The protocol parameter name does not resolve to `eco.parameters`. |
+| `match` | Та же точка и показатель, загруженное значение совпало. Воздух «не обн.» без числа не сопоставляется с рядом Excel: в PDF нет даты отбора. |
+| `mismatch` | Строка скважины подземных вод есть в базе, но значение отличается. Ставит код QC `R`. |
+| `not_in_db` | У строки протокола нет загруженного соответствия. Сюда входят воздух «не обн.» без даты и ячейки PDF, в которых два названия показателя склеены в одно. |
+| `unmapped` | Название показателя в протоколе не сопоставляется с `eco.parameters`. |
 
-Air names are hinted only for medium `air` (dust, NO2, SO2, CO, HCN). Well names go through `eco.fn_resolve_param_id`, so «Цианиды» stays cyanide in water and is not treated as HCN.
+Подсказки по названиям воздуха действуют только для среды `air` (пыль, NO2, SO2, CO, HCN). Названия скважин проходят через `eco.fn_resolve_param_id`, поэтому «Цианиды» остаются цианидами в воде и не трактуются как HCN.
 
-### Random 5% (`sample_kind = random_5pct`)
+### Случайные 5% (`sample_kind = random_5pct`)
 
-`ceil(5% × number of results)` result ids, drawn with seed `20260922`.
+`ceil(5% × число результатов)` идентификаторов результатов, выборка с зерном `20260922`.
 
-| Disposition | Meaning |
+| Итог | Смысл |
 |---|---|
-| `match` | The drawn result was already matched to the PDF in the protocol pass. |
-| `no_protocol` | `DB_input` has no protocol for that point and date. The QC code is left to the rules in section 2. |
+| `match` | Выбранный результат уже совпал с PDF на проходе по протоколу. |
+| `no_protocol` | В `DB_input` нет протокола на эту точку и дату. Код QC остаётся по правилам раздела 2. |
 
-## Where this is implemented
+## Где это реализовано
 
-| Piece | Location |
+| Часть | Где |
 |---|---|
-| Tables, rule list, `fn_apply_qc` | `sql/migrations/009_qaqc.sql` |
-| Findings, PDF compare, 5% sample, report | `etl/qaqc.py` |
-| Entry point | `etl/phase4.py` |
-| Acceptance check | `sql/verify_phase4.sql` |
-| Latest run numbers | `docs/qa_phase4_report.md` |
+| Таблицы, список правил, `fn_apply_qc` | `sql/migrations/009_qaqc.sql` |
+| Замечания, сравнение с PDF, выборка 5%, отчёт | `etl/qaqc.py` |
+| Точка входа | `etl/phase4.py` |
+| Приёмочная проверка | `sql/verify_phase4.sql` |
+| Числа последнего прогона | `docs/qa_phase4_report.md` |

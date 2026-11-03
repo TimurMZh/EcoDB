@@ -1,55 +1,55 @@
-# Server requirements (EcoDB)
+# Требования к серверу (EcoDB)
 
-Short sizing guide for hosting EcoDB: PostgreSQL 14 + PostGIS (Docker), Python ETL, ArcGIS Enterprise Query Layers.
+Краткая оценка ресурсов для размещения EcoDB: PostgreSQL 14 + PostGIS (Docker), Python ETL, Query Layer ArcGIS Enterprise.
 
-## Software
+## Программное обеспечение
 
-| Component | Requirement |
-| --------- | ----------- |
-| OS | Windows Server (or Linux) |
-| Runtime | Docker + Docker Compose |
-| Database image | `postgis/postgis:14-3.4` |
-| PostgreSQL client | `psql`, `pg_isready` (migrations via `sql/apply.sh`) |
+| Компонент | Требование |
+| --------- | ---------- |
+| ОС | Windows Server (или Linux) |
+| Среда выполнения | Docker + Docker Compose |
+| Образ базы | `postgis/postgis:14-3.4` |
+| Клиент PostgreSQL | `psql`, `pg_isready` (миграции через `sql/apply.sh`) |
 | Python | 3.11+ |
-| ETL deps | `etl/requirements.txt` (`openpyxl`, `psycopg2-binary`, `pymupdf`) |
-| GIS client | ArcGIS Enterprise — Query Layers on schema `eco` (EPSG:4326) |
+| Зависимости ETL | `etl/requirements.txt` (`openpyxl`, `psycopg2-binary`, `pymupdf`) |
+| ГИС-клиент | ArcGIS Enterprise — Query Layer по схеме `eco` (EPSG:4326) |
 
-Optional: Adminer (`adminer:4`) for web SQL UI. Prefer internal-only access in production.
+По желанию: Adminer (`adminer:4`) как веб-интерфейс SQL. В промышленной среде предпочтителен доступ только из внутренней сети.
 
-## Hardware
+## Оборудование
 
-Current data volume is small (lab Excel/PDF imports + ~50 MB Oskemen station files). For a dedicated DB/ETL host:
+Текущий объём данных невелик (импорт лабораторных Excel/PDF и около 50 МБ файлов автостанций Оскемена). Для выделенного узла БД и ETL:
 
-| Resource | Minimum | Recommended |
-| -------- | ------- | ----------- |
-| CPU | 2 vCPU | 4 vCPU |
-| RAM | 4 GB | 8 GB |
-| Disk | 40 GB | 100 GB SSD |
-| Network | LAN to ArcGIS / admins | Stable; see ports below |
+| Ресурс | Минимум | Рекомендуется |
+| ------ | ------- | ------------- |
+| Процессор | 2 vCPU | 4 vCPU |
+| Память | 4 ГБ | 8 ГБ |
+| Диск | 40 ГБ | 100 ГБ SSD |
+| Сеть | локальная сеть до ArcGIS и администраторов | устойчивая; порты ниже |
 
-If ArcGIS Enterprise runs on the same machine, add its own RAM/CPU on top (often 16 GB+). Prefer a separate host for EcoDB when ArcGIS is already heavy.
+Если ArcGIS Enterprise работает на той же машине, добавьте его собственные память и процессор сверху (часто 16 ГБ и более). Когда ArcGIS уже нагружен, EcoDB лучше размещать на отдельном узле.
 
-## Ports
+## Порты
 
-| Port | Service | Notes |
-| ---- | ------- | ----- |
-| 5432 | PostgreSQL / PostGIS | Required for ArcGIS and ETL |
-| 8080 | Adminer | Optional; restrict or disable in production |
+| Порт | Служба | Примечание |
+| ---- | ------ | ---------- |
+| 5432 | PostgreSQL / PostGIS | нужен для ArcGIS и ETL |
+| 8080 | Adminer | по желанию; в промышленной среде ограничить или отключить |
 
-Outbound HTTPS is needed only if running `dataset/fetch_oskemen_raw.py` (AirData.kz, Open-Meteo).
+Исходящий HTTPS нужен только при запуске `dataset/fetch_oskemen_raw.py` (AirData.kz, Open-Meteo).
 
-## Default connection (dev)
+## Подключение по умолчанию (стенд)
 
 | | |
 | --- | --- |
-| Database | `eco_monitoring` |
-| User / password | `eco` / `eco` |
+| База | `eco_monitoring` |
+| Пользователь / пароль | `eco` / `eco` |
 
-Change credentials before any production deploy.
+Учётные данные смените до любой промышленной публикации.
 
-## Roles on the server
+## Роли на сервере
 
-1. `docker compose up -d` — PostGIS (+ Adminer)
-2. Apply schema — `sql/apply.sh` (or Windows equivalent)
-3. Run ETL — `python etl/phase2.py` … `phase4.py` as needed
-4. Register ArcGIS Query Layers on views such as `eco.vw_results_flat`, `eco.vw_latest_results`
+1. `docker compose up -d` — PostGIS (и Adminer)
+2. Применить схему — `sql/apply.sh` (или эквивалент для Windows)
+3. Запустить ETL — `python etl/phase2.py` … `phase4.py` по необходимости
+4. Зарегистрировать Query Layer ArcGIS на представлениях, например `eco.vw_results_flat`, `eco.vw_latest_results`

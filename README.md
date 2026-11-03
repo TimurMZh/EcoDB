@@ -1,26 +1,24 @@
 # EcoDB
 
-TO REWRITE: for Window Server
+ПЕРЕПИСАТЬ: для Windows Server
 
-Relational database for environmental monitoring (air, surface water, groundwater, soil, vegetation). Built on PostgreSQL 14 with PostGIS, intended for use with ArcGIS Enterprise Query Layers.
+Реляционная база экологического мониторинга (воздух, поверхностные воды, подземные воды, почва, растительность). PostgreSQL 14 с PostGIS, для Query Layer ArcGIS Enterprise.
 
-Spatial data uses **WGS84 / EPSG:4326**. The application schema is `eco`.
+Пространственные данные — **WGS84 / EPSG:4326**. Схема приложения — `eco`.
 
-## Requirements
+## Требования
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- PostgreSQL client tools (`psql`, `pg_isready`) on the host — needed to run migrations
+- [Docker](https://docs.docker.com/get-docker/) и Docker Compose
+- Клиентские утилиты PostgreSQL (`psql`, `pg_isready`) на хосте — нужны для миграций
 
-On macOS:
+На macOS:
 
 ```bash
 brew install libpq
-# then add libpq to PATH, e.g. echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
+# затем добавьте libpq в PATH, например echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
 ```
 
-
-
-## Quick start
+## Быстрый старт
 
 ```bash
 git clone https://github.com/TimurMZh/EcoDB.git
@@ -31,86 +29,80 @@ chmod +x sql/apply.sh
 ./sql/apply.sh
 ```
 
-Default connection:
-
+Подключение по умолчанию:
 
 |                 |                  |
 | --------------- | ---------------- |
-| Host            | `localhost`      |
-| Port            | `5432`           |
-| Database        | `eco_monitoring` |
-| User / password | `eco` / `eco`    |
+| Хост            | `localhost`      |
+| Порт            | `5432`           |
+| База            | `eco_monitoring` |
+| Пользователь / пароль | `eco` / `eco`    |
 
+При необходимости переопределите через `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`.
 
-Override with `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD` if needed.
+Adminer (веб-интерфейс SQL) — [http://localhost:8080](http://localhost:8080). Сервер: `postgis`, учётные данные как выше.
 
-Adminer (web SQL UI) is at [http://localhost:8080](http://localhost:8080). Server: `postgis`, credentials as above.
+## Миграции
 
-## Migrations
+Нумерованные SQL-файлы в `sql/migrations/` применяются по порядку. Уже применённые версии пропускаются (`eco.schema_migrations`).
 
-Numbered SQL files in `sql/migrations/` are applied in order. Already-applied versions are skipped (`eco.schema_migrations`).
+| Файл                | Содержимое                                                      |
+| ------------------- | --------------------------------------------------------------- |
+| `001_init.sql`      | расширение PostGIS, схема `eco`, журнал миграций                |
+| `002_tables.sql`    | таблицы, ограничения, справочники сред и кодов QC               |
+| `003_indexes.sql`   | GIST по геометрии, btree-индексы, уникальные ключи              |
+| `004_functions.sql` | триггеры, разбор лабораторных значений, проверка превышений, ETL staging |
+| `005_views.sql`     | представления Query Layer для ArcGIS и права `SELECT`           |
 
-
-| File                | Contents                                                    |
-| ------------------- | ----------------------------------------------------------- |
-| `001_init.sql`      | PostGIS extension, schema `eco`, migration log              |
-| `002_tables.sql`    | Tables, constraints, media-type and QC reference data       |
-| `003_indexes.sql`   | GIST on geometry, btree indexes, unique keys                |
-| `004_functions.sql` | Triggers, lab-value parsing, exceedance checks, staging ETL |
-| `005_views.sql`     | ArcGIS Query Layer views and `SELECT` grants                |
-
-
-Rebuild the schema from scratch:
+Пересоздать схему с нуля:
 
 ```bash
 ./sql/apply.sh --reset
 ```
 
+## Обзор схемы
 
-
-## Schema overview
-
-Full ER diagram with attributes: [docs/er-diagram.md](docs/er-diagram.md).
+Полная диаграмма с атрибутами: [docs/er-diagram.md](docs/er-diagram.md).
 
 ```mermaid
 erDiagram
-    sites ||--o{ monitoring_points : has
-    monitoring_points ||--o{ point_aliases : aka
-    monitoring_points ||--o{ sampling_events : at
-    sites ||--o{ sampling_events : hosts
-    sampling_events ||--o{ samples : collects
-    laboratories |o--o{ samples : analyzes
-    samples ||--o{ results : has
-    parameters ||--o{ results : measured
-    results ||--o{ result_exceedances : flagged
-    parameters ||--o{ guideline_values : limit_for
-    guideline_standards ||--o{ guideline_values : defines
-    guideline_values ||--o{ result_exceedances : against
-    monitoring_points ||--o{ field_measurements : at
-    monitoring_points ||--o{ water_levels : at
-    parameters ||--o{ parameter_aliases : aka
+    sites ||--o{ monitoring_points : "имеет"
+    monitoring_points ||--o{ point_aliases : "синоним"
+    monitoring_points ||--o{ sampling_events : "на точке"
+    sites ||--o{ sampling_events : "размещает"
+    sampling_events ||--o{ samples : "отбирает"
+    laboratories |o--o{ samples : "анализирует"
+    samples ||--o{ results : "имеет"
+    parameters ||--o{ results : "измерен"
+    results ||--o{ result_exceedances : "отмечено"
+    parameters ||--o{ guideline_values : "предел для"
+    guideline_standards ||--o{ guideline_values : "задаёт"
+    guideline_values ||--o{ result_exceedances : "по нормативу"
+    monitoring_points ||--o{ field_measurements : "на точке"
+    monitoring_points ||--o{ water_levels : "на точке"
+    parameters ||--o{ parameter_aliases : "синоним"
 ```
 
+**Среды:** `air`, `surface_water`, `groundwater`, `soil`, `vegetation`.
 
+**Коды QA/QC:** `A` / `B` / `C` (входят в последние результаты), `D` / `R` (отклонено / на проверке — исключены из `vw_latest_results`).
 
-**Media types:** `air`, `surface_water`, `groundwater`, `soil`, `vegetation`.
+Справочники загружает фаза 2 (`python3 etl/phase2.py seed`) из `DB_input/Ecology_DB_general*.xlsx`.
 
-**QA/QC codes:** `A` / `B` / `C` (included in latest results), `D` / `R` (rejected / review — excluded from `vw_latest_results`).
+## Импорт лаборатории
 
-Reference catalogs are loaded by Phase 2 (`python3 etl/phase2.py seed`) from `DB_input/Ecology_DB_general*.xlsx`.
+Следующая поставка (куда положить файл, какую команду запустить, что удаляет повторный запуск) — `docs/loading-data.md`.
 
-## Lab import
-
-Phase 2 seeds dictionaries and loads the air Excel as batch `AIR_PILOT`:
+Фаза 2 заполняет справочники и загружает Excel воздуха как партию `AIR_PILOT`:
 
 ```bash
 ./sql/apply.sh
 python3 etl/phase2.py
 ```
 
-`etl/phase2.py` inserts raw air rows into `eco.staging_lab_import` and runs `fn_process_staging_import('AIR_PILOT')`. The function maps point and parameter aliases, parses values such as `<0.01` and «не обн.», upserts events / samples / results, and records failures on the staging row (`process_error`). Empty HCN cells are stored as «не обн.» (confirmed in the PDF); other empty air cells are left empty and rejected. Source PDK in the Excel file is stored in `extra_json` but limits come from `guideline_values`. Exceedances are calculated by trigger.
+`etl/phase2.py` вставляет сырые строки воздуха в `eco.staging_lab_import` и вызывает `fn_process_staging_import('AIR_PILOT')`. Функция сопоставляет синонимы точек и показателей, разбирает значения вроде `<0.01` и «не обн.», обновляет события, пробы и результаты и записывает сбои в строку staging (`process_error`). Пустые ячейки HCN сохраняются как «не обн.» (подтверждено PDF); остальные пустые ячейки воздуха остаются пустыми и отклоняются. ПДК из Excel хранится в `extra_json`, пределы берутся из `guideline_values`. Превышения считает триггер.
 
-Phase 3 loads the 2025 water report tables and the named wells from the PDF. It does not reuse the air parser. Blank quarter cells are skipped; «нет» is stored and rejected as “not measured”. The PDF has no sample date, so wells are dated 2025-01-01 and flagged in `extra_json`.
+Фаза 3 загружает отчётные таблицы воды за 2025 год и именные скважины из PDF. Разбор воздуха она не использует. Пустые ячейки кварталов пропускаются; «нет» сохраняется и отклоняется как «не измерено». В PDF нет даты отбора, поэтому скважины датируются 2025-01-01 и помечаются в `extra_json`.
 
 ```bash
 ./sql/apply.sh
@@ -118,9 +110,9 @@ python3 etl/phase3.py
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase3.sql
 ```
 
-Batches: `WATER_SURFACE_2025` (points `SW-1`…`SW-4`), `WATER_GROUND_2025` (`GW-1`…`GW-10`), `WATER_WELLS_PDF` (`ФС-1`, `ФС-4`, `ФС-5`, `НС-2`). `GW-1`…`GW-4` repeat the surface Q1 values; they stay separate until that is confirmed. PDK in the water Excels is `0` and is not used.
+Партии: `WATER_SURFACE_2025` (точки `SW-1`…`SW-4`), `WATER_GROUND_2025` (`GW-1`…`GW-10`), `WATER_WELLS_PDF` (`ФС-1`, `ФС-4`, `ФС-5`, `НС-2`). `GW-1`…`GW-4` повторяют значения поверхностных вод за 1 квартал; они остаются раздельными, пока это не подтверждено. ПДК в водных Excel равен `0` и не используется.
 
-Phase 4 assigns QC codes and writes the spot-check act. Rules are in `eco.qa_rules` (A verified against the PDF, B below detection as reported, C default, R review — including blanks stored as «не обн.»). D and R stay out of `vw_latest_results`.
+Фаза 4 присваивает коды QC и пишет акт выборочной сверки. Правила лежат в `eco.qa_rules` (A — сверено с PDF, B — ниже обнаружения по источнику, C — по умолчанию, R — на проверке, включая пустые ячейки, записанные как «не обн.»). D и R не попадают в `vw_latest_results`.
 
 ```bash
 ./sql/apply.sh
@@ -128,57 +120,51 @@ python3 etl/phase4.py
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase4.sql
 ```
 
-The act is `docs/qa_phase4_report.md`.
+Акт — `docs/qa_phase4_report.md`.
 
-Phase 5 is the ArcGIS handover. Migration `010` adds a read-only login `eco_gis`. `sql/verify_phase5.sql` checks that the four views have a unique `objectid` and a `geom` column, that `vw_latest_results` hides QC codes D and R, and that `vw_results_flat` for site `OSK` over 2020–2025 returns within 3 seconds. Registration in ArcGIS Enterprise is described in `docs/ops-handover.md` (Russian). This repository does not contain an Enterprise server, so the layers are not published here.
+Фаза 5 — сдача в ArcGIS. Миграция `010` добавляет логин только на чтение `eco_gis`. `sql/verify_phase5.sql` проверяет, что у четырёх представлений есть уникальный `objectid` и столбец `geom`, что `vw_latest_results` скрывает коды QC D и R и что `vw_results_flat` по объекту `OSK` за 2020–2025 отвечает не дольше 3 секунд. Регистрация в ArcGIS Enterprise описана в `docs/ops-handover.md`. В этом репозитории сервера Enterprise нет, поэтому слои здесь не публикуются.
 
-To recompute all exceedances after changing guideline values:
+Пересчитать все превышения после изменения нормативов:
 
 ```sql
 SELECT eco.fn_recalc_all_exceedances();
 ```
 
+## Представления (Query Layer ArcGIS)
 
+У каждого представления есть уникальный целочисленный `objectid` и необязательный `geom` (`Point`, 4326). Пустая геометрия допустима.
 
-## Views (ArcGIS Query Layers)
+| Представление                | Одна строка на                                      | `objectid`      |
+| ---------------------------- | --------------------------------------------------- | --------------- |
+| `eco.vw_results_flat`        | лабораторный результат                              | `result_id`     |
+| `eco.vw_exceedances_summary` | результат × норматив                                | `exceedance_id` |
+| `eco.vw_latest_results`      | последний лабораторный результат пары (точка, показатель) | `result_id` |
+| `eco.vw_water_levels`        | уровень подземных вод                               | `level_id`      |
+| `eco.vw_sensor_latest`       | последний час автостанции на пару (точка, показатель) | `result_id`   |
+| `eco.vw_sensor_latest_wide`  | автостанция (все последние загрязнители и метео)    | `point_id`      |
+| `eco.vw_sensor_daily`        | сутки UTC × станция × показатель                    | синтетический   |
 
-Each view has a unique integer `objectid` and optional `geom` (`Point`, 4326). Null geometry is allowed.
+Зарегистрируйте их как Query Layer в ArcGIS Enterprise по схеме `eco`.
 
+## Дымовая проверка
 
-| View                         | One row per                                | `objectid`      |
-| ---------------------------- | ------------------------------------------ | --------------- |
-| `eco.vw_results_flat`        | lab result                                 | `result_id`     |
-| `eco.vw_exceedances_summary` | result × standard                          | `exceedance_id` |
-| `eco.vw_latest_results`      | latest lab result per (point, parameter)   | `result_id`     |
-| `eco.vw_water_levels`        | groundwater level                          | `level_id`      |
-| `eco.vw_sensor_latest`       | latest station hour per (point, parameter) | `result_id`     |
-| `eco.vw_sensor_latest_wide`  | station (all latest pollutants + meteo)    | `point_id`      |
-| `eco.vw_sensor_daily`        | UTC day × station × parameter              | synthetic       |
-
-
-Register these as Query Layers in ArcGIS Enterprise against the `eco` schema.
-
-## Smoke test
-
-Applies sample inserts, import, and exceedance checks, then **rolls back**:
+Выполняет пробные вставки, импорт и проверки превышений, затем **откатывает**:
 
 ```bash
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase1.sql
 ```
 
-Password: `eco`. Requires the schema to be applied first.
+Пароль: `eco`. Сначала должна быть применена схема.
 
-After Phase 2 data load:
+После загрузки данных фазы 2:
 
 ```bash
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase2.sql
 ```
 
+## Набор данных качества воздуха по Оскемену
 
-
-## Oskemen air-quality dataset
-
-Hourly air quality for Oskemen (Ust-Kamenogorsk) is pulled from AirData.kz: KazHydroMet via the open dump. Station files keep those published values. Hours a station did not report are left empty. Meteorology (temperature, pressure, humidity, wind) is Open-Meteo ERA5 at the station coordinates, because the Oskemen dump has no weather files. There is no model training step. Station files include every pollutant present in `raw/` (PM2.5, PM10, SO2, NO2, …).
+Почасовое качество воздуха по Оскемену (Усть-Каменогорск) берётся с AirData.kz: Казгидромет через открытую выгрузку. Файлы станций сохраняют опубликованные значения. Часы, которые станция не передала, остаются пустыми. Метеорология (температура, давление, влажность, ветер) — Open-Meteo ERA5 в координатах станции: в выгрузке по Оскемену файлов погоды нет. Обучения модели нет. В файлы станций входят все загрязнители из `raw/` (PM2.5, PM10, SO2, NO2, …).
 
 ```bash
 python3 -m venv .venv
@@ -186,12 +172,12 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r dataset/requirements.txt
 python dataset/fetch_oskemen_raw.py --parameters pm25 pm10 so2 no2 no co h2s o3 pmtot
 python dataset/build_oskemen_stations.py
-python dataset/plot_oskemen_stations.py   # optional map
+python dataset/plot_oskemen_stations.py   # карта по желанию
 ```
 
-Output lands in `dataset/Oskemen/`. The panel runs from the first PM2.5 hour in the fetch through the last hour. Override with `--start` / `--end`. Every station with at least one reported value is kept, including a record that covers less than 1% of the window. Unreported hours stay empty.
+Результат попадает в `dataset/Oskemen/`. Панель идёт от первого часа PM2.5 в выгрузке до последнего часа. Переопределение: `--start` / `--end`. Сохраняется каждая станция хотя бы с одним переданным значением, в том числе ряд, который покрывает меньше 1% окна. Непереданные часы остаются пустыми.
 
-Load the 13 stations into `eco_monitoring` (hourly pollutants → `eco.results` as `sample_type = hourly_sensor`, µg/m³ as published; meteorology → `eco.meteo_observations`, joined on station + hour):
+Загрузка 13 станций в `eco_monitoring` (почасовые загрязнители → `eco.results` с `sample_type = hourly_sensor`, мкг/м³ как опубликовано; метеорология → `eco.meteo_observations`, соединение по станции и часу):
 
 ```bash
 ./sql/apply.sh
@@ -199,27 +185,27 @@ python etl/load_oskemen_stations.py
 psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_oskemen.sql
 ```
 
-Lab Query Layers stay on PEK samples. ArcGIS station layers: `eco.vw_sensor_latest` (long), `eco.vw_sensor_latest_wide` (one row per station), `eco.vw_sensor_daily` (UTC daily min/avg/max). Incremental refill: `python etl/load_oskemen_stations.py --since 2026-10-01`.
+Лабораторные Query Layer остаются на пробах ПЭК. Слои автостанций в ArcGIS: `eco.vw_sensor_latest` (длинный), `eco.vw_sensor_latest_wide` (одна строка на станцию), `eco.vw_sensor_daily` (суточные min/avg/max по UTC). Дозагрузка: `python etl/load_oskemen_stations.py --since 2026-10-01`.
 
-## Project layout
+## Состав проекта
 
 ```
 docker-compose.yml      PostGIS 14-3.4 + Adminer
-docs/er-diagram.md      Entity-relationship diagram
-dataset/                Oskemen air-quality fetch + station panel
-etl/phase2.py           Seed dictionaries + AIR_PILOT load
-etl/load_oskemen_stations.py  Hourly KazHydroMet stations + ERA5 meteo
-etl/phase3.py           Water report + PDF well loaders
-etl/phase4.py           QA/QC codes, 5% sample, spot-check report
-docs/ops-handover.md    ArcGIS registration and reload instructions
-docs/roles.md           Read / edit / admin roles, logins to create on the server
-sql/apply.sh            Apply (or reset) migrations
-sql/verify_phase1.sql   Phase 1 smoke test (always ROLLBACK)
-sql/verify_phase2.sql   Phase 2 row-count checks (does not roll back)
-sql/verify_phase3.sql   Phase 3 water-load checks (does not roll back)
-sql/verify_phase4.sql   Phase 4 QA/QC checks
-sql/verify_phase5.sql   Query Layer contract and 3-second check
-sql/verify_roles.sql    Role and privilege checks (migration 011)
-sql/migrations/         Numbered schema scripts
+docs/er-diagram.md      диаграмма сущность–связь
+dataset/                выгрузка качества воздуха по Оскемену и панель станций
+etl/phase2.py           справочники и загрузка AIR_PILOT
+etl/load_oskemen_stations.py  почасовые станции Казгидромета и метео ERA5
+etl/phase3.py           загрузка отчётов по воде и скважин из PDF
+etl/phase4.py           коды QA/QC, выборка 5%, акт сверки
+docs/loading-data.md    как импортировать новый Excel, PDF или период станций
+docs/ops-handover.md    регистрация в ArcGIS; шаги дозагрузки указывают на loading-data.md
+docs/roles.md           роли чтения, правки и администрирования, логины на сервере
+sql/apply.sh            применить миграции или сбросить схему
+sql/verify_phase1.sql   дымовая проверка фазы 1 (всегда ROLLBACK)
+sql/verify_phase2.sql   проверка числа строк фазы 2 (без отката)
+sql/verify_phase3.sql   проверка загрузки воды фазы 3 (без отката)
+sql/verify_phase4.sql   проверки QA/QC фазы 4
+sql/verify_phase5.sql   контракт Query Layer и проверка 3 секунд
+sql/verify_roles.sql    проверка ролей и прав (миграция 011)
+sql/migrations/         нумерованные скрипты схемы
 ```
-

@@ -1,27 +1,31 @@
 03.09.26
-To do:
+Задачи:
 
-1. Create example of connection from ipynb to PosgreSQL - done
-2. To check bash script for windows - in progress
-3. To import historical data for Oskemen - done
-4. To create pipeline to collect data - in progress
+1. Пример подключения из ipynb к PostgreSQL — сделано
+2. Проверить bash-скрипт для Windows — в работе
+3. Импортировать исторические данные по Оскемену — сделано
+4. Создать конвейер сбора данных — в работе
 
 24.09.26
 
-1. Requirement for server
-2. To check historical data for Oskemen
-  PM2.5 from 24 March 2021 to 1 May 2026
-    PM10, SO2, NO2, CO, H2S, NO, total PM from 2 December 2021 to 1 May 2026 (total PM ends 31 July 2025)
-    O3 from 4 December 2025 to 1 May 2026
-3. To send examples of air quality
+1. Требования к серверу
+2. Проверить исторические данные по Оскемену
+  PM2.5 с 24 марта 2021 по 1 мая 2026
+    PM10, SO2, NO2, CO, H2S, NO, общая пыль с 2 декабря 2021 по 1 мая 2026 (общая пыль заканчивается 31 июля 2025)
+    O3 с 4 декабря 2025 по 1 мая 2026
+3. Отправить примеры качества воздуха
 
 02.10.26
 
-1. To ask about backups on the server - to create script for backup - weekly - done
-2. To create security rules - done
-3. To check all meteo data from AirData.kz - Only temperature, pressure, humidity, wind_speed_ wind direction
+1. Уточнить резервные копии на сервере — создать скрипт резервного копирования git, еженедельно — сделано
+2. Создать правила безопасности — сделано
+3. Проверить все метеоданные с AirData.kz — только температура, давление, влажность, скорость и направление ветра
 
 15.10.26
 
-1. To download all data from Oskem without 70% of missing data
+1. Скачать все данные по Оскемену без 70% пропусков — сделано
 
+22.10.26
+
+1. Сравнить KGMT и официальные данные по местоположению и дате-времени
+2. Протестировать конвейер ETL

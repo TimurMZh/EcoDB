@@ -72,28 +72,7 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 
 ## Дозагрузка новой партии
 
-1. Положить файл в `DB_input` (или указать путь в загрузчике).
-2. Если появились новые точки, лаборатории или написания показателей — дополнить справочники (`python3 etl/phase2.py seed`) и синонимы в `eco.parameter_aliases` / `eco.point_aliases`.
-3. Загрузить сырые строки в `eco.staging_lab_import` со своим `batch_code`. Существующие загрузчики:
-
-```bash
-python3 etl/phase2.py air    # AIR_PILOT, файл воздуха
-python3 etl/phase3.py water  # три водных партии
-```
-
-Для нового файла нужна своя функция чтения. Контракт строки staging описан в `etl/load_air.py` и `etl/load_water.py`: код точки, название или код показателя, дата, сырой текст результата, `batch_code`. Преобразования делаются не при вставке в staging, а функцией:
-
-```sql
-SELECT * FROM eco.fn_process_staging_import('НОВЫЙ_КОД_ПАРТИИ');
-```
-
-Функция идемпотентна по паре (проба, показатель): повтор обновляет `results`. Неразобранные строки остаются с `processed_at IS NULL` и текстом в `process_error`.
-
-1. Пересчитать QC и акт:
-
-```bash
-python3 etl/phase4.py
-```
+Пошаговая инструкция для новой поставки Excel, PDF и часов автостанций: `docs/loading-data.md`.
 
 
 
