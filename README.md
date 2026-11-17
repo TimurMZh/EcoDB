@@ -1,33 +1,30 @@
 # EcoDB
 
-ПЕРЕПИСАТЬ: для Windows Server
-
 Реляционная база экологического мониторинга (воздух, поверхностные воды, подземные воды, почва, растительность). PostgreSQL 14 с PostGIS, для Query Layer ArcGIS Enterprise.
 
 Пространственные данные — **WGS84 / EPSG:4326**. Схема приложения — `eco`.
 
+База ставится как служба Windows. Docker не нужен. Порядок установки — [docs/install-windows.md](docs/install-windows.md).
+
 ## Требования
 
-- [Docker](https://docs.docker.com/get-docker/) и Docker Compose
-- Клиентские утилиты PostgreSQL (`psql`, `pg_isready`) на хосте — нужны для миграций
+- Windows Server (или другой компьютер, где уже есть PostgreSQL 14 и PostGIS 3.4)
+- [PostgreSQL 14](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads) и PostGIS 3.4 (Stack Builder)
+- Python 3.11+ для ETL
 
-На macOS:
-
-```bash
-brew install libpq
-# затем добавьте libpq в PATH, например echo 'export PATH="/opt/homebrew/opt/libpq/bin:$PATH"' >> ~/.zshrc
-```
+Утилиты `psql` и `pg_isready` входят в установку PostgreSQL (`C:\Program Files\PostgreSQL\14\bin`).
 
 ## Быстрый старт
 
-```bash
+```powershell
 git clone https://github.com/TimurMZh/EcoDB.git
 cd EcoDB
 
-docker compose up -d
-chmod +x sql/apply.sh
-./sql/apply.sh
+powershell -ExecutionPolicy Bypass -File scripts\init-db.ps1
+powershell -ExecutionPolicy Bypass -File sql\apply.ps1
 ```
+
+`init-db.ps1` спрашивает пароль суперпользователя `postgres`, создаёт роль `eco` и базу `eco_monitoring`. PostGIS к этому моменту уже должен быть установлен.
 
 Подключение по умолчанию:
 
@@ -40,7 +37,9 @@ chmod +x sql/apply.sh
 
 При необходимости переопределите через `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`.
 
-Adminer (веб-интерфейс SQL) — [http://localhost:8080](http://localhost:8080). Сервер: `postgis`, учётные данные как выше.
+SQL-клиент — pgAdmin (ставится вместе с PostgreSQL). Сервер `localhost`, учётные данные как выше.
+
+Команды ниже написаны и для bash (`python3`, `./sql/apply.sh`). На Windows то же самое: `python` и `sql\apply.ps1` (`sql\apply.ps1 -Reset` вместо `./sql/apply.sh --reset`).
 
 ## Миграции
 
@@ -190,7 +189,9 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_oske
 ## Состав проекта
 
 ```
-docker-compose.yml      PostGIS 14-3.4 + Adminer
+docs/install-windows.md установка PostgreSQL 14 и PostGIS без Docker
+scripts/init-db.ps1     роль eco и база eco_monitoring
+scripts/backup.bat      еженедельный дамп (служба PostgreSQL, не контейнер)
 docs/er-diagram.md      диаграмма сущность–связь
 dataset/                выгрузка качества воздуха по Оскемену и панель станций
 etl/phase2.py           справочники и загрузка AIR_PILOT
@@ -200,7 +201,8 @@ etl/phase4.py           коды QA/QC, выборка 5%, акт сверки
 docs/loading-data.md    как импортировать новый Excel, PDF или период станций
 docs/ops-handover.md    регистрация в ArcGIS; шаги дозагрузки указывают на loading-data.md
 docs/roles.md           роли чтения, правки и администрирования, логины на сервере
-sql/apply.sh            применить миграции или сбросить схему
+sql/apply.ps1           применить миграции на Windows (или сбросить схему: -Reset)
+sql/apply.sh            то же самое в bash, если PostgreSQL уже установлен
 sql/verify_phase1.sql   дымовая проверка фазы 1 (всегда ROLLBACK)
 sql/verify_phase2.sql   проверка числа строк фазы 2 (без отката)
 sql/verify_phase3.sql   проверка загрузки воды фазы 3 (без отката)
