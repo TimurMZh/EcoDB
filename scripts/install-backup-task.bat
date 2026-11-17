@@ -4,7 +4,8 @@ setlocal EnableExtensions
 rem Run once on the database server, as Administrator.
 rem Creates the scheduled task "EcoDB weekly backup": Sunday 02:00,
 rem whether or not anyone is logged on. The task account is SYSTEM,
-rem which must be able to run docker and write D:\eco-backups.
+rem which must be able to run pg_dump, read D:\eco-backups\pgpass.conf,
+rem and write D:\eco-backups.
 rem Set SHARE in backup.bat before the first run.
 
 set "TASK=EcoDB weekly backup"

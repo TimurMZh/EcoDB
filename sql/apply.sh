@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Apply numbered SQL migrations. Already-applied versions are skipped.
 # Recreate from scratch: ./sql/apply.sh --reset
+# Windows: sql\apply.ps1  (and sql\apply.ps1 -Reset)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

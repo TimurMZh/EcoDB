@@ -4,9 +4,9 @@
 
 Проверка на стенде:
 
-```bash
-./sql/apply.sh
-psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phase5.sql
+```powershell
+powershell -ExecutionPolicy Bypass -File sql\apply.ps1
+& "C:\Program Files\PostgreSQL\14\bin\psql.exe" -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql\verify_phase5.sql
 ```
 
 ## Что передаётся
@@ -14,7 +14,7 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 
 | Материал                      | Где                                                 |
 | ----------------------------- | --------------------------------------------------- |
-| DDL схемы, с нуля             | `sql/migrations/001` … `010`, запуск `sql/apply.sh` |
+| DDL схемы, с нуля             | `sql/migrations/001` … `012`, запуск `sql\apply.ps1` |
 | Загрузка воздуха, воды, QA/QC | `etl/phase2.py`, `etl/phase3.py`, `etl/phase4.py`   |
 | Акт QA/QC и объёмы            | `docs/qa_phase4_report.md`                          |
 | Перечень проверок QA/QC       | `docs/qaqc-checks.md`                               |
@@ -23,7 +23,7 @@ psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_phas
 | Эта инструкция                | `docs/ops-handover.md`                              |
 
 
-Повторный запуск миграций пропускает уже применённые версии. Полный сброс схемы: `./sql/apply.sh --reset`, затем снова фазы 2–4.
+Повторный запуск миграций пропускает уже применённые версии. Полный сброс схемы: `sql\apply.ps1 -Reset`, затем снова фазы 2–4.
 
 ## Подключение ArcGIS
 

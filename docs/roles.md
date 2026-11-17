@@ -11,18 +11,18 @@
 Отдельно от групп:
 
 - `eco_gis` — логин ArcGIS (миграция `010`). `SELECT` только по четырём представлениям Query Layer, `statement_timeout = 60s`. Не входит ни в одну группу.
-- `eco` — начальный суперпользователь, созданный Docker (`POSTGRES_USER`). Только для создания логинов и аварийных случаев, не для повседневной работы.
+- `eco` — начальный суперпользователь, его создаёт `scripts\init-db.ps1`. Только для создания логинов и аварийных случаев, не для повседневной работы.
 - У `PUBLIC` нет доступа к базе и к схеме `eco`.
 
 Таблицы, которые может менять только `eco_admin`: `ref_media_types`, `ref_qc_codes`, `guideline_standards`, `guideline_values`, `qa_rules`, `schema_migrations`. Изменение значения норматива меняет каждое превышение, поэтому это задача администратора.
 
 ## После установки на сервере
 
-Один раз, после `docker compose up -d` и `./sql/apply.sh`.
+Один раз, после `scripts\init-db.ps1` и `sql\apply.ps1`.
 
 1. Откройте `psql` под начальным суперпользователем:
-  ```bash
-   docker exec -it eco-postgis psql -U eco -d eco_monitoring
+  ```powershell
+   & "C:\Program Files\PostgreSQL\14\bin\psql.exe" -h localhost -U eco -d eco_monitoring
   ```
 2. Создайте логины. `\password` запрашивает пароль интерактивно, поэтому он не попадает в историю оболочки и в журналы. Используйте 20 и более случайных символов.
   ```sql
@@ -45,8 +45,8 @@
    \password eco
   ```
 3. Проверьте результат:
-  ```bash
-   psql -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql/verify_roles.sql
+  ```powershell
+   & "C:\Program Files\PostgreSQL\14\bin\psql.exe" -h localhost -U eco -d eco_monitoring -v ON_ERROR_STOP=1 -f sql\verify_roles.sql
   ```
    Скрипт печатает `Roles OK` и список логинов с их группами. Любая проблема останавливает скрипт ошибкой, в которой названы роль и объект.
 
@@ -54,7 +54,7 @@
 
 | Задача | Логин |
 | --- | --- |
-| `./sql/apply.sh`, `./sql/apply.sh --reset` | логин администратора (скрипт сам переключается на `eco_admin`) |
+| `sql\apply.ps1`, `sql\apply.ps1 -Reset` | логин администратора (скрипт сам переключается на `eco_admin`) |
 | `python etl/phase2.py seed`, `python etl/phase3.py seed` (пишет значения нормативов) | логин администратора |
 | `python etl/phase2.py air`, `python etl/phase3.py water`, `python etl/phase4.py` | `eco_etl` |
 | Query Layer в ArcGIS | `eco_gis` |

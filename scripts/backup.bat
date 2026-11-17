@@ -2,25 +2,33 @@
 setlocal EnableExtensions
 
 rem Weekly logical backup of eco_monitoring.
-rem Dumps inside the Docker container (custom format is binary; do not
-rem redirect pg_dump through PowerShell), copies the files off this server,
-rem checks the checksum, then deletes the local staging copies.
+rem pg_dump writes the custom-format file itself (-f). Do not redirect
+rem pg_dump through PowerShell: ">" treats the stream as text and corrupts it.
+rem The script then copies the files off this server, checks the checksum,
+rem and deletes the local staging copies.
 rem
-rem Before the first run, set SHARE below to a folder that is not on this
-rem server. Register the weekly task once, on the server, as Administrator:
-rem   scripts\install-backup-task.bat
+rem Before the first run:
+rem   1. Install PostgreSQL 14 (docs/install-windows.md).
+rem   2. Set SHARE below to a folder that is not on this server.
+rem   3. Create %ROOT%\pgpass.conf (one line, see docs/backups.md).
+rem   4. Register the weekly task once, on the server, as Administrator:
+rem        scripts\install-backup-task.bat
 rem
-rem docker exec uses the container's local socket, which trusts user eco.
-rem No password is stored in this file.
+rem The password is not stored in this file. libpq reads PGPASSFILE.
 
-set "CONTAINER=eco-postgis"
+if not defined PGBIN set "PGBIN=C:\Program Files\PostgreSQL\14\bin"
+if not defined PGHOST set "PGHOST=localhost"
+if not defined PGPORT set "PGPORT=5432"
+if not defined PGUSER set "PGUSER=eco"
+if not defined PGDATABASE set "PGDATABASE=eco_monitoring"
+
 set "DB=eco_monitoring"
-set "DBUSER=eco"
 set "ROOT=D:\eco-backups"
 set "STAGING=%ROOT%\staging"
 set "LOG=%ROOT%\backup.log"
 set "LOCK=%ROOT%\backup.lock"
 set "KEEP_DAYS=84"
+if not defined PGPASSFILE set "PGPASSFILE=%ROOT%\pgpass.conf"
 
 rem Off-server folder. Required. Example: \\fileserver\eco-backups\weekly
 set "SHARE="
@@ -39,20 +47,23 @@ if not defined STAMP (
 
 call :log "start %STAMP%"
 
-set "DOCKER=docker"
-where docker >nul 2>&1
-if errorlevel 1 (
-    if exist "C:\Program Files\Docker\Docker\resources\bin\docker.exe" (
-        set "DOCKER=C:\Program Files\Docker\Docker\resources\bin\docker.exe"
-    ) else (
-        set "REASON=docker not found on PATH"
-        goto :fail
-    )
+if not exist "%PGBIN%\pg_dump.exe" (
+    set "REASON=pg_dump not found in %PGBIN%. Install PostgreSQL 14 or set PGBIN."
+    goto :fail
+)
+if not exist "%PGBIN%\pg_dumpall.exe" (
+    set "REASON=pg_dumpall not found in %PGBIN%."
+    goto :fail
 )
 
-"%DOCKER%" inspect -f "{{.State.Running}}" %CONTAINER% 2>nul | findstr /I /X "true" >nul
+"%PGBIN%\pg_isready.exe" -q -h "%PGHOST%" -p %PGPORT% -d "%PGDATABASE%"
 if errorlevel 1 (
-    set "REASON=container %CONTAINER% is not running"
+    set "REASON=PostgreSQL is not accepting connections at %PGHOST%:%PGPORT%"
+    goto :fail
+)
+
+if not exist "%PGPASSFILE%" (
+    set "REASON=password file not found: %PGPASSFILE%. See docs/backups.md."
     goto :fail
 )
 
@@ -67,26 +78,17 @@ if exist "%LOCK%" (
 > "%LOCK%" echo %STAMP%
 set "LOCKHELD=1"
 
-"%DOCKER%" exec %CONTAINER% pg_dump -U %DBUSER% -d %DB% -Fc --no-password -f /tmp/eco_monitoring_%STAMP%.dump
+"%PGBIN%\pg_dump.exe" -h "%PGHOST%" -p %PGPORT% -U "%PGUSER%" -d "%DB%" -Fc --no-password -f "%STAGING%\eco_monitoring_%STAMP%.dump"
 if errorlevel 1 (
+    del /f /q "%STAGING%\eco_monitoring_%STAMP%.dump" 2>nul
     set "REASON=pg_dump failed"
     goto :fail
 )
 
-"%DOCKER%" exec %CONTAINER% pg_dumpall -U %DBUSER% --globals-only --no-password -f /tmp/eco_globals_%STAMP%.sql
+"%PGBIN%\pg_dumpall.exe" -h "%PGHOST%" -p %PGPORT% -U "%PGUSER%" --globals-only --no-password -f "%STAGING%\eco_globals_%STAMP%.sql"
 if errorlevel 1 (
+    del /f /q "%STAGING%\eco_monitoring_%STAMP%.dump" "%STAGING%\eco_globals_%STAMP%.sql" 2>nul
     set "REASON=pg_dumpall --globals-only failed"
-    goto :fail
-)
-
-"%DOCKER%" cp %CONTAINER%:/tmp/eco_monitoring_%STAMP%.dump "%STAGING%\eco_monitoring_%STAMP%.dump"
-if errorlevel 1 (
-    set "REASON=docker cp of the database dump failed"
-    goto :fail
-)
-"%DOCKER%" cp %CONTAINER%:/tmp/eco_globals_%STAMP%.sql "%STAGING%\eco_globals_%STAMP%.sql"
-if errorlevel 1 (
-    set "REASON=docker cp of the globals file failed"
     goto :fail
 )
 
@@ -139,7 +141,6 @@ call :prune "eco_monitoring_*.sha256"
 call :prune "eco_globals_*.sql"
 call :prune "eco_globals_*.sha256"
 
-call :cleanup_tmp
 del /f /q "%LOCK%"
 call :log "OK %STAMP% copied to %SHARE%"
 exit /b 0
@@ -150,16 +151,8 @@ goto :fail
 
 :fail
 call :log "FAILED: %REASON%"
-if "%LOCKHELD%"=="1" (
-    call :cleanup_tmp
-    del /f /q "%LOCK%"
-)
+if "%LOCKHELD%"=="1" del /f /q "%LOCK%"
 exit /b 1
-
-:cleanup_tmp
-if not defined STAMP exit /b 0
-"%DOCKER%" exec %CONTAINER% rm -f /tmp/eco_monitoring_%STAMP%.dump /tmp/eco_globals_%STAMP%.sql >nul 2>&1
-exit /b 0
 
 :prune
 forfiles /P "%SHARE%" /M "%~1" /D -%KEEP_DAYS% /C "cmd /c del /f /q @path" >nul 2>&1
